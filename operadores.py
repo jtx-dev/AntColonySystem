@@ -1,12 +1,41 @@
 import numpy as np
-def leer_datos():
-    coordenadas = []
+import pandas as pd
 
-    with open('datos/instancia.txt', 'r') as lector:
-        for linea in lector:
-            partes = linea.split()
-            if len(partes) <= 3 :
-                x = coordenadas.append(partes[1])
-                y = coordenadas.append(partes[2])
-    return (coordenadas)
-leer_datos()
+
+def leer_datos(entrada):
+    # Lee el identificador y las coordenadas de cada ciudad.
+    coordenadas = pd.read_table(entrada, header=None, sep=r'\s+')
+    coordenadas = coordenadas.drop(columns=0).to_numpy()
+    n = coordenadas.shape[0]
+    return coordenadas, n
+
+
+def calcular_distancias(coordenadas, n):
+    # Berlin52 usa distancias euclidianas redondeadas al entero más cercano.
+    matriz_distancias = np.zeros((n, n), dtype=int)
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            distancia = np.sqrt(
+                np.sum(np.square(coordenadas[i] - coordenadas[j]))
+            )
+            matriz_distancias[i][j] = int(distancia + 0.5)
+            matriz_distancias[j][i] = matriz_distancias[i][j]
+    return matriz_distancias
+
+
+def recorrido_valido(recorrido, n):
+    return len(recorrido) == n and set(recorrido) == set(range(n))
+
+
+def calcular_distancia_recorrido(recorrido, matriz_distancias):
+    n = len(matriz_distancias)
+    if not recorrido_valido(recorrido, n):
+        raise ValueError('El recorrido debe visitar cada ciudad exactamente una vez.')
+
+    distancia_total = 0
+    for i in range(n):
+        origen = recorrido[i]
+        destino = recorrido[(i + 1) % n]
+        distancia_total += matriz_distancias[origen][destino]
+
+    return int(distancia_total)
