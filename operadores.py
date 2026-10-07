@@ -1,22 +1,41 @@
 import numpy as np
 import pandas as pd
-def leer_datos():
 
-    # Función: leer datos
-    # Esta función lee los datos de la instancia.txt
-    # almacenandolos en una matriz de distancias
 
-    entrada = 'datos/instancia.txt'
-    coordenadas = pd.read_table(entrada , header = None, sep = '\s+', skiprows = 0, skipfooter = 0)
+def leer_datos(entrada):
+    # Lee el identificador y las coordenadas de cada ciudad.
+    coordenadas = pd.read_table(entrada, header=None, sep=r'\s+')
     coordenadas = coordenadas.drop(columns=0).to_numpy()
     n = coordenadas.shape[0]
-    return(coordenadas , n)
+    return coordenadas, n
+
+
 def calcular_distancias(coordenadas, n):
-    matriz_distancias=np.full((n, n), fill_value = -1.0, dtype = float)
-    for i in range(n-1):
-        for j in range(i+1, n):
-            matriz_distancias[i][j] = np.sqrt(np.sum(np.square(coordenadas[i]- coordenadas[j])))
+    # Berlin52 usa distancias euclidianas redondeadas al entero más cercano.
+    matriz_distancias = np.zeros((n, n), dtype=int)
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            distancia = np.sqrt(
+                np.sum(np.square(coordenadas[i] - coordenadas[j]))
+            )
+            matriz_distancias[i][j] = int(distancia + 0.5)
             matriz_distancias[j][i] = matriz_distancias[i][j]
-    print(matriz_distancias)
-coordenadas, n = leer_datos()
-calcular_distancias(coordenadas, n)
+    return matriz_distancias
+
+
+def recorrido_valido(recorrido, n):
+    return len(recorrido) == n and set(recorrido) == set(range(n))
+
+
+def calcular_distancia_recorrido(recorrido, matriz_distancias):
+    n = len(matriz_distancias)
+    if not recorrido_valido(recorrido, n):
+        raise ValueError('El recorrido debe visitar cada ciudad exactamente una vez.')
+
+    distancia_total = 0
+    for i in range(n):
+        origen = recorrido[i]
+        destino = recorrido[(i + 1) % n]
+        distancia_total += matriz_distancias[origen][destino]
+
+    return int(distancia_total)
