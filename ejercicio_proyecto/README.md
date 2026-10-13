@@ -1,0 +1,155 @@
+# Ant Colony System para PFSP
+
+Adaptación del ACS de Berlin52 (directorio raíz del repositorio) al
+*Permutation Flow Shop Scheduling Problem* (PFSP), siguiendo la metodología
+del Pre Proyecto 2: separar el **algoritmo general** (`acs.py`) de los
+**operadores específicos del problema** (`operadores.py`), probarlos,
+experimentar con los parámetros y analizar los resultados.
+
+El objetivo es encontrar la permutación de trabajos que minimiza el makespan
+`C_max`, calculado con la recursión
+
+```
+C(i, j) = max(C(i-1, j), C(i, j-1)) + p[π_i, j],   C(0, j) = C(i, 0) = 0,   C_max = C(n, m)
+```
+
+## Requisitos
+
+- Python 3.10 o superior.
+- NumPy y matplotlib (matplotlib solo para `graficar.py`).
+
+```bash
+pip install numpy matplotlib
+```
+
+## Estructura
+
+```
+ejercicio_proyecto/
+├── acs.py            # Algoritmo ACS y ejecución por consola (qué hace el algoritmo)
+├── operadores.py     # Biblioteca de operadores PFSP (cómo se realiza cada operación)
+├── tests.py          # Pruebas de los operadores y del algoritmo
+├── experimentos.py   # Experimentos variando los parámetros de ACS
+├── graficar.py       # Gráficos de convergencia y de experimentos
+├── datos/            # Instancias de Taillard
+├── resultados/       # CSV de ejecuciones y experimentos
+├── graficos/         # Gráficos PDF
+└── README.md
+```
+
+Todos los comandos se ejecutan desde la carpeta `ejercicio_proyecto`.
+
+## Instancias
+
+| Archivo | Instancia | Tamaño | Semilla de Taillard | Mejor conocido (`C_max`) |
+|---|---|---|---|---|
+| `datos/tai20_5.txt` | ta001 | 20 × 5 | 873654221 | 1278 |
+| `datos/tai50_10.txt` | ta041 | 50 × 10 | 1958948863 | 2991 |
+| `datos/tai100_10.txt` | ta071 | 100 × 10 | 1539989115 | 5770 |
+
+Los archivos usan el formato de Taillard: una línea con
+`n m semilla cota_superior cota_inferior` y luego `m` filas (una por máquina)
+con los `n` tiempos de procesamiento. Los tiempos se obtuvieron con el
+generador publicado por Taillard (1993) a partir de las semillas oficiales;
+ta001 coincide con la instancia publicada. Los mejores valores conocidos de
+permutación provienen de la tabla de Mattfeld y Vaessens. `leer_instancia`
+también acepta los archivos originales de Taillard (lee la primera instancia).
+
+## Ejecución
+
+Orden fijo de argumentos, según el enunciado del Proyecto 2: instancia,
+semilla, hormigas, iteraciones, evaporación (`alpha`), peso heurístico
+(`beta`), `q0` y archivo de salida.
+
+```bash
+python acs.py datos/tai20_5.txt 12345 50 200 1.0 2.0 0.9 resultados/res_acs.csv
+```
+
+Restricciones: hormigas e iteraciones > 0, `0 < alpha <= 1`, `beta >= 0` y
+`0 <= q0 <= 1`. Ante argumentos o archivos inválidos se muestra un mensaje
+de error y el uso correcto.
+
+En pantalla se muestran la instancia, la mejor secuencia (trabajos numerados
+desde 1), su makespan, el mejor valor conocido, el RPD y el tiempo. El CSV
+registra, para cada iteración, la instancia, la semilla, los parámetros, la
+mejor secuencia de la iteración y la mejor global con sus makespans, el mejor
+valor conocido, el RPD y el tiempo acumulado:
+
+```
+RPD(%) = (C_max obtenido - C_max mejor conocido) / C_max mejor conocido × 100
+```
+
+La misma semilla e instancia entregan siempre la misma secuencia y el mismo
+makespan.
+
+## Algoritmo
+
+`acs.py` muestra las etapas del algoritmo; los detalles están en `operadores.py`:
+
+```
+inicializar                τ0 = 1 / (n · C_max(SPT)), matriz τ, heurística η
+repetir por iteración:
+    construir soluciones   cada hormiga arma una permutación + actualización local
+    evaluar soluciones     makespan de cada permutación
+    actualizar feromonas   depósito de la mejor hormiga de la iteración
+    actualizar mejor       se conserva la mejor solución global
+```
+
+Decisiones de diseño:
+
+- **Solución:** permutación de trabajos, sin regreso al trabajo inicial.
+- **Grafo:** `τ[i, j]` es la deseabilidad de programar `j` inmediatamente
+  después de `i`. Es una matriz **dirigida** (no simétrica) y tiene una fila
+  extra para un nodo de inicio ficticio, de modo que la colonia también
+  aprende qué trabajo conviene programar primero.
+- **Heurística:** `η[i, j] = 1 / (1 + ocio)`, donde
+  `ocio = Σ_k max(0, p[j, k] - p[i, k+1])` estima el tiempo que la máquina
+  `k+1` espera a `j` cuando sigue a `i`. Desde el inicio, el ocio es
+  `Σ_{k<m} p[j, k]`. Se probó primero la regla SPT (`η_j = 1 / Σ_k p[j, k]`),
+  pero no depende de la transición y su secuencia tiene un RPD de 26 % en
+  ta041, similar al de una permutación aleatoria (28 %); con ella ACS quedaba
+  alrededor de 14 % en ta041, frente a ~10 % con la heurística de ocio.
+- **Regla de transición:** con probabilidad `q0` se elige el trabajo con mayor
+  `τ[i, j] · η[i, j]^β` (explotación); si no, se sortea proporcionalmente a
+  ese valor (exploración).
+- **Actualización local:** `τ[i, j] ← (1 - α) τ[i, j] + α τ0` en cada arista usada.
+- **Actualización global:** `τ[i, j] ← (1 - α) τ[i, j] + α / C_max` en las
+  aristas de la mejor hormiga de la iteración, lo que mantiene el orden
+  *actualizar feromonas → actualizar mejor solución* del enunciado.
+
+## Pruebas
+
+```bash
+python tests.py
+```
+
+Verifican que:
+
+- las instancias se leen correctamente (tamaños, cotas y tiempos de ta001);
+- el makespan coincide con un ejemplo de 3 trabajos × 2 máquinas calculado a mano;
+- se rechazan secuencias inválidas y el RPD se calcula bien;
+- la heurística, la feromona inicial y las actualizaciones local y global
+  siguen sus fórmulas;
+- las hormigas generan permutaciones válidas;
+- el algoritmo es reproducible y la mejor solución mejora o se mantiene.
+
+## Experimentos
+
+```bash
+python experimentos.py                 # genera resultados/experimentos.csv
+python graficar.py resultados/experimentos.csv graficos/experimentos.pdf
+```
+
+Configuración base: 20 hormigas, 100 iteraciones, `alpha = 0.1`, `beta = 2.0`,
+`q0 = 0.9`. Se varía un parámetro a la vez y cada configuración se ejecuta
+con las semillas 1 a 5 en las tres instancias.
+
+## Gráficos
+
+```bash
+python graficar.py resultados/res_acs_tai50_10.csv graficos/convergencia_tai50_10.pdf
+```
+
+Si se omite el segundo argumento se usa `graficos/<nombre del CSV>.pdf`.
+`graficar.py` reconoce si el CSV proviene de `acs.py` (curva de convergencia)
+o de `experimentos.py` (sensibilidad a los parámetros y calidad vs. tiempo).
