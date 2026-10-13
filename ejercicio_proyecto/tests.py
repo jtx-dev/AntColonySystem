@@ -1,8 +1,11 @@
+import csv
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 
 from acs import ParametrosACS, ejecutar_acs
+from ag import ejecutar_ag
 from operadores import (
     actualizar_feromona_local,
     actualizar_feromonas,
@@ -11,10 +14,16 @@ from operadores import (
     calcular_heuristica,
     calcular_makespan,
     calcular_rpd,
+    cruce_ox,
     construir_secuencia,
+    evaluar_poblacion,
+    generar_poblacion,
+    guardar_resultados,
     inicializar_feromonas,
     leer_instancia,
+    mutacion_insercion,
     secuencia_valida,
+    siguiente_generacion,
 )
 
 DATOS = Path(__file__).parent / 'datos'
@@ -137,6 +146,70 @@ def probar_algoritmo():
     )
 
 
+def probar_operadores_ag():
+    generador = np.random.default_rng(42)
+    padre1 = list(range(7))
+    padre2 = list(reversed(padre1))
+    for _ in range(30):
+        hijo1, hijo2 = cruce_ox(padre1, padre2, generador)
+        mutado = mutacion_insercion(hijo1, generador)
+        assert secuencia_valida(hijo1, 7)
+        assert secuencia_valida(hijo2, 7)
+        assert secuencia_valida(mutado, 7)
+        assert padre1 == list(range(7)) and padre2 == list(reversed(padre1))
+        assert hijo1 != mutado  # se eligieron posiciones distintas
+
+    poblacion = generar_poblacion(5, 3, generador)
+    makespans = evaluar_poblacion(poblacion, EJEMPLO)
+    antes = [list(individuo) for individuo in poblacion]
+    nueva = siguiente_generacion(poblacion, makespans, 1.0, 1.0, generador)
+    assert len(nueva) == 5  # también funciona con población impar
+    assert all(secuencia_valida(individuo, 3) for individuo in nueva)
+    assert nueva[0] == antes[int(np.argmin(makespans))]  # elitismo
+    assert poblacion == antes  # los padres no se mutan en sitio
+
+
+def probar_ag_completo():
+    tiempos, mejor_conocido = leer_instancia(DATOS / 'tai20_5.txt')
+    secuencia, makespan, historial = ejecutar_ag(tiempos, 123, 7, 6, 0.8, 0.1)
+    repetida, costo_repetido, _ = ejecutar_ag(tiempos, 123, 7, 6, 0.8, 0.1)
+    assert (secuencia, makespan) == (repetida, costo_repetido)
+    assert secuencia_valida(secuencia, 20)
+    assert calcular_makespan(secuencia, tiempos) == makespan
+    assert len(historial) == 6
+    assert [fila['iteracion'] for fila in historial] == list(range(1, 7))
+    assert [fila['mejor_makespan'] for fila in historial] == sorted(
+        (fila['mejor_makespan'] for fila in historial), reverse=True
+    )
+    for fila in historial:
+        secuencia_fila = [int(valor) - 1 for valor in fila['mejor_secuencia'].split()]
+        assert calcular_makespan(secuencia_fila, tiempos) == fila['mejor_makespan']
+        assert fila['mejor_makespan'] <= fila['makespan_iteracion']
+
+    with TemporaryDirectory(dir=Path(__file__).parent) as temporal:
+        salida = Path(temporal) / 'res_ag.csv'
+        guardar_resultados(
+            salida, 'AG', DATOS / 'tai20_5.txt', 123,
+            {'iteraciones': 6, 'poblacion': 7, 'prob_cruce': 0.8, 'prob_mutacion': 0.1},
+            mejor_conocido, historial,
+        )
+        with salida.open(newline='', encoding='utf-8') as archivo:
+            filas = list(csv.DictReader(archivo))
+        assert len(filas) == 6
+        assert filas[-1]['algoritmo'] == 'AG'
+        assert filas[-1]['mejor_secuencia'] == historial[-1]['mejor_secuencia']
+        assert int(filas[-1]['mejor_makespan']) == makespan
+        assert np.isclose(float(filas[-1]['rpd']), calcular_rpd(makespan, mejor_conocido))
+
+    for parametros in [(1, 6, 0.8, 0.1), (7, 0, 0.8, 0.1), (7, 6, 1.2, 0.1)]:
+        try:
+            ejecutar_ag(tiempos, 123, *parametros)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('El AG debe rechazar parámetros fuera de rango.')
+
+
 if __name__ == '__main__':
     probar_lectura_taillard()
     probar_makespan_calculado_a_mano()
@@ -146,4 +219,6 @@ if __name__ == '__main__':
     probar_construccion()
     probar_mejor_solucion()
     probar_algoritmo()
+    probar_operadores_ag()
+    probar_ag_completo()
     print('Pruebas correctas.')

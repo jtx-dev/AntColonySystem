@@ -1,4 +1,8 @@
-# Ant Colony System para PFSP
+# AG y ACS para PFSP
+
+El algoritmo genético (`ag.py`) reutiliza los operadores del Proyecto 1,
+adaptados al formato de datos y evaluador comunes de este proyecto. El
+algoritmo memético se incorporará en la siguiente etapa.
 
 Adaptación del ACS de Berlin52 (directorio raíz del repositorio) al
 *Permutation Flow Shop Scheduling Problem* (PFSP), siguiendo la metodología
@@ -27,7 +31,8 @@ pip install numpy matplotlib
 ```
 ejercicio_proyecto/
 ├── acs.py            # Algoritmo ACS y ejecución por consola (qué hace el algoritmo)
-├── operadores.py     # Biblioteca de operadores PFSP (cómo se realiza cada operación)
+├── ag.py             # Algoritmo genético y ejecución por consola
+├── operadores.py     # Datos, evaluación y operadores de los algoritmos
 ├── tests.py          # Pruebas de los operadores y del algoritmo
 ├── experimentos.py   # Experimentos variando los parámetros de ACS
 ├── graficar.py       # Gráficos de convergencia y de experimentos
@@ -56,6 +61,32 @@ permutación provienen de la tabla de Mattfeld y Vaessens. `leer_instancia`
 también acepta los archivos originales de Taillard (lee la primera instancia).
 
 ## Ejecución
+
+### Algoritmo genético
+
+```bash
+python ag.py datos/tai20_5.txt 12345 50 200 0.8 0.1 resultados/res_ag.csv
+```
+
+Argumentos, en ese orden: instancia, semilla, tamaño de población,
+generaciones, probabilidad de cruce, probabilidad de mutación y salida CSV.
+La población debe contener al menos 2 individuos; las generaciones deben ser
+positivas y las probabilidades estar entre 0 y 1. `python ag.py --help` muestra
+la ayuda completa.
+
+El AG usa torneo de dos individuos, cruce OX, mutación por inserción y un
+individuo élite. Se siembra un generador local para que la misma instancia,
+semilla y parámetros produzcan la misma secuencia y makespan. Su CSV tiene
+una fila por generación: mejor de esa generación, mejor acumulado, RPD y
+tiempo de CPU acumulado. El tiempo incluye la búsqueda desde la población
+inicial y excluye lectura y escritura de archivos. El mejor acumulado se
+inicializa con la población inicial y, por eso, nunca empeora.
+
+Los trabajos se indexan desde 0 dentro del programa y desde 1 en pantalla y
+CSV. La matriz común es `tiempos[trabajo, maquina]`. AG y ACS llaman al mismo
+`calcular_makespan` de `operadores.py`.
+
+### Ant Colony System
 
 Orden fijo de argumentos, según el enunciado del Proyecto 2: instancia,
 semilla, hormigas, iteraciones, evaporación (`alpha`), peso heurístico

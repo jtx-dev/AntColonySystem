@@ -1,4 +1,4 @@
-"""Gráficos a partir de los CSV de acs.py (convergencia) o experimentos.py (parámetros)."""
+"""Gráficos de convergencia y de experimentos a partir de archivos CSV."""
 import argparse
 import csv
 from pathlib import Path
@@ -24,7 +24,8 @@ def graficar_convergencia(filas, salida):
     plt.axhline(int(filas[0]['mejor_conocido']), color='gray', linestyle='--', label='Mejor conocido')
     plt.xlabel('Iteración')
     plt.ylabel('Makespan')
-    plt.title(f"Convergencia de ACS — {filas[0]['instancia']} (semilla {filas[0]['semilla']})")
+    algoritmo = filas[0].get('algoritmo') or 'ACS'
+    plt.title(f"Convergencia de {algoritmo} — {filas[0]['instancia']} (semilla {filas[0]['semilla']})")
     plt.legend()
     plt.grid(alpha=0.3)
     plt.tight_layout()
