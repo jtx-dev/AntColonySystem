@@ -220,6 +220,39 @@ def siguiente_generacion(poblacion, makespans, prob_cruce, prob_mutacion, genera
     return nueva
 
 
+def busqueda_local_insercion(secuencia, tiempos):
+    """Acepta la primera mejora, con un máximo de 10*n vecinos evaluados."""
+    actual = list(secuencia)
+    costo_actual = calcular_makespan(actual, tiempos)
+    n = len(actual)
+    evaluaciones = 0
+    limite = 10 * n
+
+    while evaluaciones < limite:
+        hubo_mejora = False
+        for origen in range(n):
+            for destino in range(n):
+                if origen == destino:
+                    continue
+                vecino = list(actual)
+                vecino.insert(destino, vecino.pop(origen))
+                costo_vecino = calcular_makespan(vecino, tiempos)
+                evaluaciones += 1
+                if costo_vecino < costo_actual:
+                    actual, costo_actual = vecino, costo_vecino
+                    hubo_mejora = True
+                    break
+                if evaluaciones >= limite:
+                    break
+            if hubo_mejora:
+                break
+            if evaluaciones >= limite:
+                break
+        if not hubo_mejora:
+            break
+    return actual, costo_actual
+
+
 # Salida común prevista para AG y AM; ACS se adaptará al acordar el formato con el equipo.
 CAMPOS_RESULTADO = [
     'algoritmo', 'instancia', 'semilla', 'iteraciones',

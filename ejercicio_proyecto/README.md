@@ -1,8 +1,7 @@
-# AG y ACS para PFSP
+# AG, AM y ACS para PFSP
 
-El algoritmo genético (`ag.py`) reutiliza los operadores del Proyecto 1,
-adaptados al formato de datos y evaluador comunes de este proyecto. El
-algoritmo memético se incorporará en la siguiente etapa.
+AG (`ag.py`) y AM (`am.py`) reutilizan los operadores del Proyecto 1,
+adaptados al formato de datos y evaluador comunes de este proyecto.
 
 Adaptación del ACS de Berlin52 (directorio raíz del repositorio) al
 *Permutation Flow Shop Scheduling Problem* (PFSP), siguiendo la metodología
@@ -32,6 +31,7 @@ pip install numpy matplotlib
 ejercicio_proyecto/
 ├── acs.py            # Algoritmo ACS y ejecución por consola (qué hace el algoritmo)
 ├── ag.py             # Algoritmo genético y ejecución por consola
+├── am.py             # Algoritmo memético y ejecución por consola
 ├── operadores.py     # Datos, evaluación y operadores de los algoritmos
 ├── tests.py          # Pruebas de los operadores y del algoritmo
 ├── experimentos.py   # Experimentos variando los parámetros de ACS
@@ -86,6 +86,28 @@ Los trabajos se indexan desde 0 dentro del programa y desde 1 en pantalla y
 CSV. La matriz común es `tiempos[trabajo, maquina]`. AG y ACS llaman al mismo
 `calcular_makespan` de `operadores.py`.
 
+### Algoritmo memético
+
+```bash
+python am.py datos/tai20_5.txt 12345 50 200 0.8 0.1 10 resultados/res_am.csv
+```
+
+Los primeros seis argumentos son los mismos del AG. El argumento `10` es la
+**frecuencia de búsqueda local**: se aplica en las generaciones 10, 20, 30,
+etc., al mejor individuo de la población recién generada. Debe ser un entero
+positivo. `python am.py --help` muestra el orden completo.
+
+AM usa la misma selección, cruce, mutación y elitismo del AG. La búsqueda
+local mueve un trabajo a otra posición y acepta la primera inserción que
+reduce el makespan. Repite desde la solución mejorada hasta que no encuentra
+una mejora o evalúa `10 × número de trabajos` vecinos. Este límite evita que
+una sola búsqueda local en 100×10 consuma una parte excesiva del experimento.
+No incorpora perturbaciones ni reinicios por estancamiento.
+
+El CSV tiene una fila por generación, el campo `frecuencia_bl` y las mismas
+métricas que AG. El makespan de la generación se registra después de la
+búsqueda local cuando corresponda. La medición de CPU incluye esa búsqueda.
+
 ### Ant Colony System
 
 Orden fijo de argumentos, según el enunciado del Proyecto 2: instancia,
@@ -113,7 +135,7 @@ RPD(%) = (C_max obtenido - C_max mejor conocido) / C_max mejor conocido × 100
 La misma semilla e instancia entregan siempre la misma secuencia y el mismo
 makespan.
 
-## Algoritmo
+## Algoritmo ACS
 
 `acs.py` muestra las etapas del algoritmo; los detalles están en `operadores.py`:
 
@@ -163,6 +185,9 @@ Verifican que:
   siguen sus fórmulas;
 - las hormigas generan permutaciones válidas;
 - el algoritmo es reproducible y la mejor solución mejora o se mantiene.
+- AG conserva permutaciones, élite y padres; su resultado y CSV son coherentes.
+- AM aplica búsqueda local en la frecuencia indicada, mantiene la
+  reproducibilidad y respeta el límite de evaluaciones de vecinos.
 
 ## Experimentos
 

@@ -1,15 +1,18 @@
 import csv
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import numpy as np
 
 from acs import ParametrosACS, ejecutar_acs
 from ag import ejecutar_ag
+from am import ejecutar_am
 from operadores import (
     actualizar_feromona_local,
     actualizar_feromonas,
     actualizar_mejor_solucion,
+    busqueda_local_insercion,
     calcular_feromona_inicial,
     calcular_heuristica,
     calcular_makespan,
@@ -210,6 +213,63 @@ def probar_ag_completo():
             raise AssertionError('El AG debe rechazar parámetros fuera de rango.')
 
 
+def probar_busqueda_local():
+    original = [0, 1, 2]
+    with patch('operadores.calcular_makespan', wraps=calcular_makespan) as evaluar:
+        mejorada, costo = busqueda_local_insercion(original, EJEMPLO)
+    assert original == [0, 1, 2]
+    assert secuencia_valida(mejorada, 3)
+    assert costo == calcular_makespan(mejorada, EJEMPLO)
+    assert costo < calcular_makespan(original, EJEMPLO)
+    assert evaluar.call_count <= 1 + 10 * len(original)
+
+
+def probar_am_completo():
+    with patch('am.busqueda_local_insercion', wraps=busqueda_local_insercion) as buscar:
+        secuencia, makespan, historial = ejecutar_am(EJEMPLO, 123, 5, 12, 0.8, 0.1, 5)
+    assert buscar.call_count == 2  # generaciones 5 y 10
+    repetida, costo_repetido, _ = ejecutar_am(EJEMPLO, 123, 5, 12, 0.8, 0.1, 5)
+    assert (secuencia, makespan) == (repetida, costo_repetido)
+    assert secuencia_valida(secuencia, 3)
+    assert calcular_makespan(secuencia, EJEMPLO) == makespan
+    assert len(historial) == 12
+    assert [fila['mejor_makespan'] for fila in historial] == sorted(
+        (fila['mejor_makespan'] for fila in historial), reverse=True
+    )
+    for fila in historial:
+        secuencia_fila = [int(valor) - 1 for valor in fila['mejor_secuencia'].split()]
+        assert calcular_makespan(secuencia_fila, EJEMPLO) == fila['mejor_makespan']
+        assert fila['mejor_makespan'] <= fila['makespan_iteracion']
+
+    # Si no toca búsqueda local, AM sigue exactamente el ciclo del AG.
+    ag_secuencia, ag_costo, _ = ejecutar_ag(EJEMPLO, 123, 5, 4, 0.8, 0.1)
+    am_secuencia, am_costo, _ = ejecutar_am(EJEMPLO, 123, 5, 4, 0.8, 0.1, 5)
+    assert (am_secuencia, am_costo) == (ag_secuencia, ag_costo)
+
+    with TemporaryDirectory(dir=Path(__file__).parent) as temporal:
+        salida = Path(temporal) / 'res_am.csv'
+        guardar_resultados(
+            salida, 'AM', 'ejemplo_3x2.txt', 123,
+            {'iteraciones': 12, 'poblacion': 5, 'prob_cruce': 0.8,
+             'prob_mutacion': 0.1, 'frecuencia_bl': 5},
+            10, historial,
+        )
+        with salida.open(newline='', encoding='utf-8') as archivo:
+            filas = list(csv.DictReader(archivo))
+        assert len(filas) == 12
+        assert filas[-1]['algoritmo'] == 'AM'
+        assert filas[-1]['frecuencia_bl'] == '5'
+        assert int(filas[-1]['mejor_makespan']) == makespan
+
+    for frecuencia in (0, -1):
+        try:
+            ejecutar_am(EJEMPLO, 123, 5, 12, 0.8, 0.1, frecuencia)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('AM debe rechazar frecuencias no positivas.')
+
+
 if __name__ == '__main__':
     probar_lectura_taillard()
     probar_makespan_calculado_a_mano()
@@ -221,4 +281,6 @@ if __name__ == '__main__':
     probar_algoritmo()
     probar_operadores_ag()
     probar_ag_completo()
+    probar_busqueda_local()
+    probar_am_completo()
     print('Pruebas correctas.')
