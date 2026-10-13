@@ -1,120 +1,173 @@
+import argparse
+import csv
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
-import pandas as pd
 
-from operadores import calcular_distancia_recorrido, calcular_distancias, leer_datos
+from operadores import (
+    actualizar_feromona_global,
+    calcular_distancia_recorrido,
+    calcular_distancias,
+    calcular_feromona_inicial,
+    calcular_heuristica,
+    construir_recorrido,
+    inicializar_feromonas,
+    leer_datos,
+)
 
 
 @dataclass
 class ParametrosACS:
-    hormigas: int = 10
-    iteraciones: int = 100
-    q0: float = 0.9
-    peso_heuristico: float = 2.0
-    evaporacion_local: float = 0.1
-    evaporacion_global: float = 0.1
-    feromona_inicial: float = 1.0
-    semilla: int | None = 42
+    hormigas: int
+    iteraciones: int
+    evaporacion: float
+    peso_heuristico: float
+    q0: float
+    semilla: int
 
     def __post_init__(self):
         if self.hormigas <= 0:
             raise ValueError('La cantidad de hormigas debe ser mayor que cero.')
         if self.iteraciones <= 0:
             raise ValueError('La cantidad de iteraciones debe ser mayor que cero.')
-        if not 0 <= self.q0 <= 1:
-            raise ValueError('q0 debe estar entre 0 y 1.')
+        if not 0 < self.evaporacion <= 1:
+            raise ValueError('La evaporación debe estar entre 0 (excluido) y 1.')
         if self.peso_heuristico < 0:
             raise ValueError('El peso heurístico no puede ser negativo.')
-        if not 0 <= self.evaporacion_local <= 1:
-            raise ValueError('La evaporación local debe estar entre 0 y 1.')
-        if not 0 <= self.evaporacion_global <= 1:
-            raise ValueError('La evaporación global debe estar entre 0 y 1.')
-        if self.feromona_inicial <= 0:
-            raise ValueError('La feromona inicial debe ser mayor que cero.')
+        if not 0 <= self.q0 <= 1:
+            raise ValueError('q0 debe estar entre 0 y 1.')
 
 
-def crear_generador(semilla):
-    return np.random.default_rng(semilla)
+def ejecutar_acs(matriz_distancias, parametros):
+    generador = np.random.default_rng(parametros.semilla)
+    feromona_inicial = calcular_feromona_inicial(matriz_distancias)
+    feromonas = inicializar_feromonas(len(matriz_distancias), feromona_inicial)
+    heuristica = calcular_heuristica(matriz_distancias)
+    mejor_recorrido = None
+    mejor_costo = float('inf')
+    historial = []
+    inicio = perf_counter()
+
+    for iteracion in range(1, parametros.iteraciones + 1):
+        mejor_recorrido_iteracion = None
+        mejor_costo_iteracion = float('inf')
+
+        for _ in range(parametros.hormigas):
+            recorrido = construir_recorrido(
+                feromonas,
+                heuristica,
+                feromona_inicial,
+                parametros.evaporacion,
+                parametros.peso_heuristico,
+                parametros.q0,
+                generador,
+            )
+            costo = calcular_distancia_recorrido(recorrido, matriz_distancias)
+            if costo < mejor_costo_iteracion:
+                mejor_recorrido_iteracion = recorrido.copy()
+                mejor_costo_iteracion = costo
+
+        if mejor_costo_iteracion < mejor_costo:
+            mejor_recorrido = mejor_recorrido_iteracion
+            mejor_costo = mejor_costo_iteracion
+
+        actualizar_feromona_global(
+            feromonas,
+            mejor_recorrido,
+            mejor_costo,
+            parametros.evaporacion,
+        )
+        historial.append({
+            'iteracion': iteracion,
+            'mejor_recorrido_iteracion': ' '.join(
+                str(ciudad + 1) for ciudad in mejor_recorrido_iteracion
+            ),
+            'mejor_costo_iteracion': int(mejor_costo_iteracion),
+            'mejor_recorrido': ' '.join(str(ciudad + 1) for ciudad in mejor_recorrido),
+            'mejor_costo': int(mejor_costo),
+            'tiempo_segundos': perf_counter() - inicio,
+        })
+
+    return mejor_recorrido, int(mejor_costo), historial
 
 
-def inicializar_feromonas(n, feromona_inicial):
-    feromonas = np.full((n, n), feromona_inicial, dtype=float)
-    np.fill_diagonal(feromonas, 0.0)
-    return feromonas
-
-
-def calcular_heuristica(matriz_distancias):
-    heuristica = np.zeros_like(matriz_distancias, dtype=float)
-    np.divide(
-        1.0,
-        matriz_distancias,
-        out=heuristica,
-        where=matriz_distancias > 0,
-    )
-    return heuristica
-
-
-def ciudades_disponibles(ciudad_actual, visitadas, n):
-    visitadas = set(visitadas)
-    return [
-        ciudad
-        for ciudad in range(n)
-        if ciudad != ciudad_actual and ciudad not in visitadas
+def guardar_resultados(salida, instancia, parametros, historial):
+    salida = Path(salida)
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    campos = [
+        'instancia',
+        'semilla',
+        'hormigas',
+        'iteraciones',
+        'evaporacion',
+        'peso_heuristico',
+        'q0',
+        'iteracion',
+        'mejor_recorrido_iteracion',
+        'mejor_costo_iteracion',
+        'mejor_recorrido',
+        'mejor_costo',
+        'tiempo_segundos',
     ]
 
+    with salida.open('w', newline='', encoding='utf-8') as archivo:
+        escritor = csv.DictWriter(archivo, fieldnames=campos)
+        escritor.writeheader()
+        for registro in historial:
+            escritor.writerow({
+                'instancia': Path(instancia).name,
+                'semilla': parametros.semilla,
+                'hormigas': parametros.hormigas,
+                'iteraciones': parametros.iteraciones,
+                'evaporacion': parametros.evaporacion,
+                'peso_heuristico': parametros.peso_heuristico,
+                'q0': parametros.q0,
+                **registro,
+            })
 
-def preparar_acs(matriz_distancias, parametros):
-    n = len(matriz_distancias)
-    generador = crear_generador(parametros.semilla)
-    feromonas = inicializar_feromonas(n, parametros.feromona_inicial)
-    heuristica = calcular_heuristica(matriz_distancias)
-    return generador, feromonas, heuristica
+
+def crear_parser():
+    parser = argparse.ArgumentParser(
+        description='Resuelve una instancia TSP mediante Ant Colony System.'
+    )
+    parser.add_argument('instancia', help='Archivo con ciudad, coordenada X y coordenada Y.')
+    parser.add_argument('hormigas', type=int)
+    parser.add_argument('iteraciones', type=int)
+    parser.add_argument('evaporacion', type=float, help='Parámetro alpha de ACS.')
+    parser.add_argument('peso_heuristico', type=float, help='Parámetro beta de ACS.')
+    parser.add_argument('q0', type=float)
+    parser.add_argument('semilla', type=int)
+    parser.add_argument('salida', help='Archivo CSV de salida.')
+    return parser
 
 
 def main():
-    parametros = ParametrosACS()
-    entrada = Path(__file__).parent / 'datos' / 'instancia.txt'
-    coordenadas, n = leer_datos(entrada)
-    matriz_distancias = calcular_distancias(coordenadas, n)
-    _, feromonas, heuristica = preparar_acs(matriz_distancias, parametros)
+    parser = crear_parser()
+    argumentos = parser.parse_args()
 
-    print(f'Ciudades leídas: {n}')
-    print(f'Tamaño de la matriz: {matriz_distancias.shape}')
-    print(f'Hormigas: {parametros.hormigas}')
-    print(f'Iteraciones: {parametros.iteraciones}')
-    print(f'Semilla: {parametros.semilla}')
-    print(f'Tamaño de la matriz de feromonas: {feromonas.shape}')
+    try:
+        parametros = ParametrosACS(
+            argumentos.hormigas,
+            argumentos.iteraciones,
+            argumentos.evaporacion,
+            argumentos.peso_heuristico,
+            argumentos.q0,
+            argumentos.semilla,
+        )
+        coordenadas, n = leer_datos(argumentos.instancia)
+        matriz_distancias = calcular_distancias(coordenadas, n)
+        recorrido, costo, historial = ejecutar_acs(matriz_distancias, parametros)
+        guardar_resultados(argumentos.salida, argumentos.instancia, parametros, historial)
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
 
-print(f'Ciudades leídas: {n}')
-print(f'Tamaño de la matriz: {matriz_distancias.shape}')
-
-cantidad_mostrada = min(10, n)
-ciudades = range(1, cantidad_mostrada + 1)
-vista_previa = pd.DataFrame(
-    matriz_distancias[:cantidad_mostrada, :cantidad_mostrada],
-    index=ciudades,
-    columns=ciudades,
-)
-vista_previa.index.name = 'Ciudad'
-
-    vista_heuristica = pd.DataFrame(
-        heuristica[:cantidad_mostrada, :cantidad_mostrada],
-        index=ciudades,
-        columns=ciudades,
-    )
-    vista_heuristica.index.name = 'Ciudad'
-
-    print(f'\nHeurística de las primeras {cantidad_mostrada} ciudades:')
-    print(vista_heuristica.to_string())
-
-    recorrido = list(range(n))
-    distancia = calcular_distancia_recorrido(recorrido, matriz_distancias)
-    print(f'\nDistancia del recorrido 1 -> 2 -> ... -> {n} -> 1: {distancia}')
-
-    ejemplo_visitadas = {0, 1, 2}
-    disponibles = ciudades_disponibles(2, ejemplo_visitadas, n)
-    print(f'Ciudades disponibles desde ciudad 3 con 1, 2 y 3 visitadas: {disponibles}')
+    print('Mejor recorrido:', ' -> '.join(str(ciudad + 1) for ciudad in recorrido))
+    print('Costo:', costo)
+    print(f"Tiempo: {historial[-1]['tiempo_segundos']:.3f} segundos")
+    print('Resultados guardados en:', argumentos.salida)
 
 
+if __name__ == '__main__':
+    main()
