@@ -84,7 +84,7 @@ inicializa con la población inicial y, por eso, nunca empeora.
 
 Los trabajos se indexan desde 0 dentro del programa y desde 1 en pantalla y
 CSV. La matriz común es `tiempos[trabajo, maquina]`. AG y ACS llaman al mismo
-`calcular_makespan` de `operadores.py`.
+`calcular_makespan` de `operadores.py`, al igual que AM.
 
 ### Algoritmo memético
 
@@ -132,8 +132,29 @@ valor conocido, el RPD y el tiempo acumulado:
 RPD(%) = (C_max obtenido - C_max mejor conocido) / C_max mejor conocido × 100
 ```
 
-La misma semilla e instancia entregan siempre la misma secuencia y el mismo
-makespan.
+La misma semilla, instancia y parámetros entregan siempre la misma secuencia
+y el mismo makespan.
+
+## CSV y tiempo de CPU comunes
+
+AG, AM y ACS usan el mismo escritor de `operadores.py`, con las mismas
+columnas y una fila por generación o iteración. `algoritmo` identifica el
+método; los parámetros que no le corresponden quedan vacíos. Las secuencias
+se guardan desde 1 y `rpd` corresponde a `mejor_makespan`, el mejor acumulado.
+Los valores se guardan sin redondeo adicional; se redondean al mostrarlos.
+
+`tiempo_segundos` mide CPU acumulada con `process_time()`, desde antes de
+inicializar cada algoritmo. Incluye la población inicial de AG/AM, la
+heurística y feromonas iniciales de ACS, y la búsqueda local de AM. Excluye
+lectura de datos, escritura del CSV e impresión. La última fila contiene el
+resultado y tiempo final de la ejecución; las anteriores permiten graficar
+la convergencia.
+
+Los CSV de ACS generados antes de este cambio contienen tiempo transcurrido
+medido con `perf_counter()`. Es necesario repetir esas ejecuciones para
+comparar tiempos de CPU; los resultados antiguos no se convierten automáticamente.
+`experimentos.py` conserva su formato de resumen (una fila por ejecución)
+y toma el tiempo de CPU de ACS en las nuevas ejecuciones.
 
 ## Algoritmo ACS
 

@@ -23,9 +23,13 @@ def leer_instancia(entrada):
         raise ValueError('La instancia debe seguir el formato de Taillard.')
 
     n, m, _, cota_superior = (int(valor) for valor in filas[0][:4])
+    if n <= 0 or m <= 0 or cota_superior <= 0:
+        raise ValueError('Los tamaños y la cota superior deben ser positivos.')
     tiempos = np.array(filas[1:1 + m], dtype=int).T
     if tiempos.shape != (n, m):
         raise ValueError(f'Se esperaban {m} máquinas con {n} trabajos cada una.')
+    if np.any(tiempos <= 0):
+        raise ValueError('Los tiempos de procesamiento de Taillard deben ser positivos.')
     return tiempos, cota_superior
 
 
@@ -253,7 +257,7 @@ def busqueda_local_insercion(secuencia, tiempos):
     return actual, costo_actual
 
 
-# Salida común prevista para AG y AM; ACS se adaptará al acordar el formato con el equipo.
+# Salida común de AG, AM y ACS.
 CAMPOS_RESULTADO = [
     'algoritmo', 'instancia', 'semilla', 'iteraciones',
     'poblacion', 'prob_cruce', 'prob_mutacion', 'frecuencia_bl',
@@ -264,7 +268,7 @@ CAMPOS_RESULTADO = [
 
 
 def guardar_resultados(salida, algoritmo, instancia, semilla, parametros, mejor_conocido, historial):
-    """Guarda una fila por generación y deja vacíos los parámetros ajenos al método."""
+    """Guarda una fila por iteración y deja vacíos los parámetros ajenos al método."""
     salida = Path(salida)
     salida.parent.mkdir(parents=True, exist_ok=True)
     with salida.open('w', newline='', encoding='utf-8') as archivo:
