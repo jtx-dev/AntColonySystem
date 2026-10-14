@@ -1,4 +1,10 @@
-# Ant Colony System para Berlin52
+# Proyecto 2: PFSP
+
+La implementación de AG, AM y ACS para PFSP está en
+[`ejercicio_proyecto`](ejercicio_proyecto/README.md). Los comandos de esa entrega
+se ejecutan desde dicha carpeta.
+
+## Ejemplo previo: Ant Colony System para Berlin52
 
 Implementación simple y reproducible de Ant Colony System (ACS) para el
 Problema del Vendedor Viajero. La instancia incluida usa las 52 ciudades de

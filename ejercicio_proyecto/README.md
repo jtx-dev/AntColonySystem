@@ -221,6 +221,11 @@ Configuración base: 20 hormigas, 100 iteraciones, `alpha = 0.1`, `beta = 2.0`,
 `q0 = 0.9`. Se varía un parámetro a la vez y cada configuración se ejecuta
 con las semillas 1 a 5 en las tres instancias.
 
+El `resultados/experimentos.csv` incluido actualmente está incompleto (148 de
+300 ejecuciones) y fue generado antes de unificar el tiempo de CPU. Sirve
+para probar el gráfico, pero debe regenerarse por completo antes de usar sus
+resultados en el artículo.
+
 ## Gráficos
 
 ```bash
@@ -228,5 +233,5 @@ python graficar.py resultados/res_acs_tai50_10.csv graficos/convergencia_tai50_1
 ```
 
 Si se omite el segundo argumento se usa `graficos/<nombre del CSV>.pdf`.
-`graficar.py` reconoce si el CSV proviene de `acs.py` (curva de convergencia)
-o de `experimentos.py` (sensibilidad a los parámetros y calidad vs. tiempo).
+`graficar.py` reconoce los CSV de AG, AM o ACS (curva de convergencia) y el
+CSV de `experimentos.py` (sensibilidad a los parámetros y calidad vs. tiempo).

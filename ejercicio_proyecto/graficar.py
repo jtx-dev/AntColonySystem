@@ -42,7 +42,8 @@ def graficar_experimentos(filas, salida):
             grupo = [f for f in filas if f['factor'] == factor and f['instancia'] == instancia]
             valores = sorted({float(f['valor']) for f in grupo})
             rpd = [[float(f['rpd']) for f in grupo if float(f['valor']) == v] for v in valores]
-            eje.errorbar(valores, np.mean(rpd, axis=1), yerr=np.std(rpd, axis=1),
+            eje.errorbar(valores, [np.mean(grupo) for grupo in rpd],
+                         yerr=[np.std(grupo) for grupo in rpd],
                          marker='o', capsize=3, label=instancia)
         eje.set_xlabel(factor)
         eje.set_ylabel('RPD medio (%)')
@@ -65,8 +66,8 @@ def graficar_experimentos(filas, salida):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Grafica los resultados de ACS para PFSP.')
-    parser.add_argument('resultados', help='CSV generado por acs.py o experimentos.py.')
+    parser = argparse.ArgumentParser(description='Grafica resultados de AG, AM o ACS para PFSP.')
+    parser.add_argument('resultados', help='CSV generado por ag.py, am.py, acs.py o experimentos.py.')
     parser.add_argument('salida', nargs='?', help='PDF de salida (por defecto graficos/<nombre>.pdf).')
     argumentos = parser.parse_args()
 
@@ -84,7 +85,7 @@ def main():
     elif 'factor' in filas[0]:
         graficar_experimentos(filas, salida)
     else:
-        parser.error('El CSV no proviene de acs.py ni de experimentos.py.')
+        parser.error('El CSV no contiene iteraciones ni experimentos reconocibles.')
     print('Gráfico guardado en:', salida)
 
 
