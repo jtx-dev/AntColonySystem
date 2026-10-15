@@ -80,37 +80,33 @@ def crear_parser():
     return parser
 
 
-def main():
-    parser = crear_parser()
-    argumentos = parser.parse_args()
-    try:
-        tiempos, mejor_conocido = leer_instancia(argumentos.instancia)
-        secuencia, makespan, historial = ejecutar_ag(
-            tiempos, argumentos.semilla, argumentos.poblacion, argumentos.iteraciones,
-            argumentos.prob_cruce, argumentos.prob_mutacion,
-        )
-        guardar_resultados(
-            argumentos.salida, 'AG', argumentos.instancia, argumentos.semilla,
-            {
-                'iteraciones': argumentos.iteraciones,
-                'poblacion': argumentos.poblacion,
-                'prob_cruce': argumentos.prob_cruce,
-                'prob_mutacion': argumentos.prob_mutacion,
-            },
-            mejor_conocido, historial,
-        )
-    except (OSError, ValueError) as error:
-        parser.error(str(error))
 
-    trabajos, maquinas = tiempos.shape
-    print(f'Instancia: {Path(argumentos.instancia).name} ({trabajos} trabajos x {maquinas} máquinas)')
-    print('Mejor secuencia:', formatear_secuencia(secuencia))
-    print('Makespan:', makespan)
-    print('Mejor conocido:', mejor_conocido)
-    print(f'RPD: {calcular_rpd(makespan, mejor_conocido):.2f} %')
-    print(f"Tiempo de CPU: {historial[-1]['tiempo_segundos']:.3f} segundos")
-    print('Resultados guardados en:', argumentos.salida)
+parser = crear_parser()
+argumentos = parser.parse_args()
+try:
+    tiempos, mejor_conocido = leer_instancia(argumentos.instancia)
+    secuencia, makespan, historial = ejecutar_ag(
+        tiempos, argumentos.semilla, argumentos.poblacion, argumentos.iteraciones,
+        argumentos.prob_cruce, argumentos.prob_mutacion,
+    )
+    guardar_resultados(
+        argumentos.salida, 'AG', argumentos.instancia, argumentos.semilla,
+        {
+            'iteraciones': argumentos.iteraciones,
+            'poblacion': argumentos.poblacion,
+            'prob_cruce': argumentos.prob_cruce,
+            'prob_mutacion': argumentos.prob_mutacion,
+        },
+        mejor_conocido, historial,
+    )
+except (OSError, ValueError) as error:
+    parser.error(str(error))
 
-
-if __name__ == '__main__':
-    main()
+trabajos, maquinas = tiempos.shape
+print(f'Instancia: {Path(argumentos.instancia).name} ({trabajos} trabajos x {maquinas} máquinas)')
+print('Mejor secuencia:', formatear_secuencia(secuencia))
+print('Makespan:', makespan)
+print('Mejor conocido:', mejor_conocido)
+print(f'RPD: {calcular_rpd(makespan, mejor_conocido):.2f} %')
+print(f"Tiempo de CPU: {historial[-1]['tiempo_segundos']:.3f} segundos")
+print('Resultados guardados en:', argumentos.salida)
