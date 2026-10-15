@@ -68,19 +68,15 @@ def mostrar_resumen(filas):
     )
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Ejecuta los experimentos de parámetros de ACS.')
-    parser.add_argument(
-        'salida',
-        nargs='?',
-        default=CARPETA / 'resultados' / 'experimentos.csv',
-        type=Path,
-        help='Archivo CSV de salida.',
-    )
-    argumentos = parser.parse_args()
-    ejecutar_experimentos(argumentos.salida)
-    print('Resultados guardados en:', argumentos.salida)
 
-
-if __name__ == '__main__':
-    main()
+parser = argparse.ArgumentParser(description='Ejecuta los experimentos de parámetros de ACS.')
+parser.add_argument(
+    'salida',
+    nargs='?',
+    default=CARPETA / 'resultados' / 'experimentos.csv',
+    type=Path,
+    help='Archivo CSV de salida.',
+)
+argumentos = parser.parse_args()
+ejecutar_experimentos(argumentos.salida)
+print('Resultados guardados en:', argumentos.salida)
