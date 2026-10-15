@@ -1,47 +1,35 @@
-# Ant Colony System para Berlin52
+# Proyecto 2: comparación de AG, AM y ACS para PFSP
 
-Implementación simple y reproducible de Ant Colony System (ACS) para el
-Problema del Vendedor Viajero. La instancia incluida usa las 52 ciudades de
-Berlin52 y distancias `EUC_2D` redondeadas según TSPLIB.
+Implementación y comparación reproducible de un algoritmo genético, un
+algoritmo memético y Ant Colony System para minimizar el makespan del
+Permutation Flow Shop Scheduling Problem.
 
-## Requisitos
+## Estructura
 
-- Python 3.10 o superior.
-- NumPy, pandas y matplotlib.
+- `preproyecto/`: ACS aplicado a Berlin52, con enunciado, código y resultados.
+- `ejercicio_proyecto/`: código, datos, pruebas y guía de ejecución.
+- `ejercicio_proyecto/resultados/comparacion_algoritmos/`: 27 ejecuciones finales.
+- `ejercicio_proyecto/graficos/`: curvas comparativas de convergencia.
+- `informe/proyecto2.tex`: fuente del informe científico.
+- `informe/proyecto2.pdf`: informe compilado.
 
-Instalación:
+## Uso rápido
 
-```bash
-pip install numpy pandas matplotlib
+Preproyecto Berlin52:
+
+```powershell
+cd preproyecto
+py .\tests.py
+py .\acs.py .\datos\instancia.txt 50 1000 0.1 2.0 0.9 42 .\resultados\resultados_ACS.csv
 ```
 
-## Ejecución
+Proyecto 2 PFSP:
 
-Los argumentos son: instancia, hormigas, iteraciones, evaporación (`alpha`),
-peso heurístico (`beta`), `q0`, semilla y archivo CSV de salida.
-
-```bash
-python acs.py datos/instancia.txt 50 200 0.1 2.0 0.9 12345 resultados/resultados.csv
+```powershell
+cd ejercicio_proyecto
+py .\tests.py
+py .\graficar.py .\resultados\comparacion_algoritmos .\graficos
 ```
 
-El programa muestra el mejor recorrido, su costo y el tiempo empleado. El CSV
-registra la mejor solución de cada iteración y la mejor acumulada, junto con la
-instancia, semilla y parámetros utilizados.
-
-## Pruebas
-
-```bash
-python tests.py
-```
-
-Las pruebas verifican la lectura de Berlin52, las distancias, la validez de los
-recorridos, las actualizaciones de feromonas y la reproducibilidad.
-
-## Gráfico de convergencia
-
-```bash
-python graficar.py resultados/resultados.csv graficos/grafico1.pdf
-```
-
-El segundo argumento es opcional; por defecto se utiliza
-`graficos/grafico1.pdf`.
+Las instrucciones completas están en [`preproyecto/README.md`](preproyecto/README.md)
+y [`ejercicio_proyecto/README.md`](ejercicio_proyecto/README.md).

@@ -1,4 +1,4 @@
-"""Operadores de ACS para el Permutation Flow Shop Scheduling Problem (PFSP).
+"""Datos y operadores de AG, AM y ACS para el problema PFSP.
 
 Convenciones:
 - Los trabajos se numeran internamente de 0 a n-1 (en pantalla y CSV de 1 a n).
@@ -9,6 +9,7 @@ Convenciones:
   es un nodo de inicio ficticio, para que las hormigas también aprendan qué
   trabajo va primero. A diferencia del TSP, las matrices no son simétricas.
 """
+import csv
 from pathlib import Path
 
 import numpy as np
@@ -22,9 +23,13 @@ def leer_instancia(entrada):
         raise ValueError('La instancia debe seguir el formato de Taillard.')
 
     n, m, _, cota_superior = (int(valor) for valor in filas[0][:4])
+    if n <= 0 or m <= 0 or cota_superior <= 0:
+        raise ValueError('Los tamaños y la cota superior deben ser positivos.')
     tiempos = np.array(filas[1:1 + m], dtype=int).T
     if tiempos.shape != (n, m):
         raise ValueError(f'Se esperaban {m} máquinas con {n} trabajos cada una.')
+    if np.any(tiempos <= 0):
+        raise ValueError('Los tiempos de procesamiento de Taillard deben ser positivos.')
     return tiempos, cota_superior
 
 
@@ -149,3 +154,133 @@ def actualizar_mejor_solucion(mejor_secuencia, mejor_makespan, secuencia, makesp
 
 def formatear_secuencia(secuencia):
     return ' '.join(str(trabajo + 1) for trabajo in secuencia)
+
+
+# Operadores evolutivos compartidos por AG y AM.
+def generar_poblacion(tamano, cantidad_trabajos, generador):
+    """Crea permutaciones de trabajos independientes."""
+    return [generador.permutation(cantidad_trabajos).tolist() for _ in range(tamano)]
+
+
+def evaluar_poblacion(poblacion, tiempos):
+    return [calcular_makespan(individuo, tiempos) for individuo in poblacion]
+
+
+def seleccionar_padre(poblacion, makespans, generador):
+    """Torneo de dos individuos: gana el de menor makespan."""
+    primero, segundo = generador.choice(len(poblacion), size=2, replace=False)
+    ganador = primero if makespans[primero] <= makespans[segundo] else segundo
+    return poblacion[ganador]
+
+
+def cruce_ox(padre1, padre2, generador):
+    """Conserva un segmento y completa cada hijo en el orden circular del otro padre."""
+    n = len(padre1)
+    inicio, fin = sorted(generador.choice(n, size=2, replace=False))
+
+    def crear_hijo(base, otro):
+        hijo = [None] * n
+        hijo[inicio:fin + 1] = base[inicio:fin + 1]
+        usados = set(hijo[inicio:fin + 1])
+        posiciones = list(range(fin + 1, n)) + list(range(fin + 1))
+        restantes = [otro[posicion] for posicion in posiciones if otro[posicion] not in usados]
+        huecos = [posicion for posicion in posiciones if hijo[posicion] is None]
+        for posicion, trabajo in zip(huecos, restantes):
+            hijo[posicion] = trabajo
+        return hijo
+
+    return crear_hijo(padre1, padre2), crear_hijo(padre2, padre1)
+
+
+def mutacion_insercion(individuo, generador):
+    """Mueve un trabajo a otra posición sin alterar el individuo recibido."""
+    mutado = list(individuo)
+    if len(mutado) > 1:
+        origen, destino = generador.choice(len(mutado), size=2, replace=False)
+        mutado.insert(destino, mutado.pop(origen))
+    return mutado
+
+
+def siguiente_generacion(poblacion, makespans, prob_cruce, prob_mutacion, generador):
+    """Aplica elitismo de uno, torneo, OX y mutación por inserción."""
+    tamano = len(poblacion)
+    elite = list(poblacion[int(np.argmin(makespans))])
+    nueva = [elite]
+
+    while len(nueva) < tamano:
+        padre1 = seleccionar_padre(poblacion, makespans, generador)
+        padre2 = seleccionar_padre(poblacion, makespans, generador)
+        if generador.random() < prob_cruce:
+            hijo1, hijo2 = cruce_ox(padre1, padre2, generador)
+        else:
+            hijo1, hijo2 = list(padre1), list(padre2)
+
+        for hijo in (hijo1, hijo2):
+            if len(nueva) < tamano:
+                if generador.random() < prob_mutacion:
+                    hijo = mutacion_insercion(hijo, generador)
+                nueva.append(hijo)
+
+    return nueva
+
+
+def busqueda_local_insercion(secuencia, tiempos):
+    """Acepta la primera mejora, con un máximo de 10*n vecinos evaluados."""
+    actual = list(secuencia)
+    costo_actual = calcular_makespan(actual, tiempos)
+    n = len(actual)
+    evaluaciones = 0
+    limite = 10 * n
+
+    while evaluaciones < limite:
+        hubo_mejora = False
+        for origen in range(n):
+            for destino in range(n):
+                if origen == destino:
+                    continue
+                vecino = list(actual)
+                vecino.insert(destino, vecino.pop(origen))
+                costo_vecino = calcular_makespan(vecino, tiempos)
+                evaluaciones += 1
+                if costo_vecino < costo_actual:
+                    actual, costo_actual = vecino, costo_vecino
+                    hubo_mejora = True
+                    break
+                if evaluaciones >= limite:
+                    break
+            if hubo_mejora:
+                break
+            if evaluaciones >= limite:
+                break
+        if not hubo_mejora:
+            break
+    return actual, costo_actual
+
+
+# Salida común de AG, AM y ACS.
+CAMPOS_RESULTADO = [
+    'algoritmo', 'instancia', 'semilla', 'iteraciones',
+    'poblacion', 'prob_cruce', 'prob_mutacion', 'frecuencia_bl',
+    'hormigas', 'alpha', 'beta', 'q0',
+    'iteracion', 'secuencia_iteracion', 'makespan_iteracion',
+    'mejor_secuencia', 'mejor_makespan', 'mejor_conocido', 'rpd', 'tiempo_segundos',
+]
+
+
+def guardar_resultados(salida, algoritmo, instancia, semilla, parametros, mejor_conocido, historial):
+    """Guarda una fila por iteración y deja vacíos los parámetros ajenos al método."""
+    salida = Path(salida)
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    with salida.open('w', newline='', encoding='utf-8') as archivo:
+        escritor = csv.DictWriter(archivo, fieldnames=CAMPOS_RESULTADO)
+        escritor.writeheader()
+        for registro in historial:
+            escritor.writerow({
+                'algoritmo': algoritmo,
+                'instancia': Path(instancia).name,
+                'semilla': semilla,
+                **parametros,
+                **registro,
+                'mejor_conocido': mejor_conocido,
+                'rpd': calcular_rpd(registro['mejor_makespan'], mejor_conocido),
+            })

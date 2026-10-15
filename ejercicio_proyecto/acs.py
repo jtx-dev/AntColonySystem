@@ -1,8 +1,7 @@
 import argparse
-import csv
 from dataclasses import dataclass
 from pathlib import Path
-from time import perf_counter
+from time import process_time
 
 import numpy as np
 
@@ -15,6 +14,7 @@ from operadores import (
     construir_soluciones,
     evaluar_soluciones,
     formatear_secuencia,
+    guardar_resultados,
     inicializar_feromonas,
     leer_instancia,
 )
@@ -36,13 +36,14 @@ class ParametrosACS:
             raise ValueError('La cantidad de iteraciones debe ser mayor que cero.')
         if not 0 < self.alpha <= 1:
             raise ValueError('La evaporación (alpha) debe estar entre 0 (excluido) y 1.')
-        if self.beta < 0:
-            raise ValueError('El peso heurístico (beta) no puede ser negativo.')
+        if not np.isfinite(self.beta) or self.beta < 0:
+            raise ValueError('El peso heurístico (beta) debe ser finito y no negativo.')
         if not 0 <= self.q0 <= 1:
             raise ValueError('q0 debe estar entre 0 y 1.')
 
 
 def ejecutar_acs(tiempos, parametros):
+    inicio = process_time()
     # Inicializar
     generador = np.random.default_rng(parametros.semilla)
     feromona_inicial = calcular_feromona_inicial(tiempos)
@@ -50,7 +51,6 @@ def ejecutar_acs(tiempos, parametros):
     heuristica = calcular_heuristica(tiempos)
     mejor_secuencia, mejor_makespan = None, float('inf')
     historial = []
-    inicio = perf_counter()
 
     for iteracion in range(1, parametros.iteraciones + 1):
         # Construir soluciones (incluye la actualización local de feromonas)
@@ -85,37 +85,10 @@ def ejecutar_acs(tiempos, parametros):
             'makespan_iteracion': makespan_iteracion,
             'mejor_secuencia': formatear_secuencia(mejor_secuencia),
             'mejor_makespan': mejor_makespan,
-            'tiempo_segundos': perf_counter() - inicio,
+            'tiempo_segundos': process_time() - inicio,
         })
 
     return mejor_secuencia, mejor_makespan, historial
-
-
-def guardar_resultados(salida, instancia, parametros, mejor_conocido, historial):
-    salida = Path(salida)
-    salida.parent.mkdir(parents=True, exist_ok=True)
-    campos = [
-        'instancia', 'semilla', 'hormigas', 'iteraciones', 'alpha', 'beta', 'q0',
-        'iteracion', 'secuencia_iteracion', 'makespan_iteracion',
-        'mejor_secuencia', 'mejor_makespan', 'mejor_conocido', 'rpd', 'tiempo_segundos',
-    ]
-
-    with salida.open('w', newline='', encoding='utf-8') as archivo:
-        escritor = csv.DictWriter(archivo, fieldnames=campos)
-        escritor.writeheader()
-        for registro in historial:
-            escritor.writerow({
-                'instancia': Path(instancia).name,
-                'semilla': parametros.semilla,
-                'hormigas': parametros.hormigas,
-                'iteraciones': parametros.iteraciones,
-                'alpha': parametros.alpha,
-                'beta': parametros.beta,
-                'q0': parametros.q0,
-                **registro,
-                'mejor_conocido': mejor_conocido,
-                'rpd': round(calcular_rpd(registro['mejor_makespan'], mejor_conocido), 4),
-            })
 
 
 def crear_parser():
@@ -148,7 +121,17 @@ def main():
         )
         tiempos, mejor_conocido = leer_instancia(argumentos.instancia)
         secuencia, makespan, historial = ejecutar_acs(tiempos, parametros)
-        guardar_resultados(argumentos.salida, argumentos.instancia, parametros, mejor_conocido, historial)
+        guardar_resultados(
+            argumentos.salida, 'ACS', argumentos.instancia, parametros.semilla,
+            {
+                'iteraciones': parametros.iteraciones,
+                'hormigas': parametros.hormigas,
+                'alpha': parametros.alpha,
+                'beta': parametros.beta,
+                'q0': parametros.q0,
+            },
+            mejor_conocido, historial,
+        )
     except (OSError, ValueError) as error:
         parser.error(str(error))
 
@@ -158,7 +141,7 @@ def main():
     print('Makespan:', makespan)
     print('Mejor conocido:', mejor_conocido)
     print(f'RPD: {calcular_rpd(makespan, mejor_conocido):.2f} %')
-    print(f"Tiempo: {historial[-1]['tiempo_segundos']:.3f} segundos")
+    print(f"Tiempo de CPU: {historial[-1]['tiempo_segundos']:.3f} segundos")
     print('Resultados guardados en:', argumentos.salida)
 
 

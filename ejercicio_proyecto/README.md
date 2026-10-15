@@ -1,7 +1,10 @@
-# Ant Colony System para PFSP
+# AG, AM y ACS para PFSP
 
-Adaptación del ACS de Berlin52 (directorio raíz del repositorio) al
-*Permutation Flow Shop Scheduling Problem* (PFSP), siguiendo la metodología
+AG (`ag.py`) y AM (`am.py`) reutilizan los operadores del Proyecto 1,
+adaptados al formato de datos y evaluador comunes de este proyecto.
+
+Adaptación al *Permutation Flow Shop Scheduling Problem* (PFSP) del ACS
+desarrollado previamente para Berlin52, siguiendo la metodología
 del Pre Proyecto 2: separar el **algoritmo general** (`acs.py`) de los
 **operadores específicos del problema** (`operadores.py`), probarlos,
 experimentar con los parámetros y analizar los resultados.
@@ -27,10 +30,12 @@ pip install numpy matplotlib
 ```
 ejercicio_proyecto/
 ├── acs.py            # Algoritmo ACS y ejecución por consola (qué hace el algoritmo)
-├── operadores.py     # Biblioteca de operadores PFSP (cómo se realiza cada operación)
+├── ag.py             # Algoritmo genético y ejecución por consola
+├── am.py             # Algoritmo memético y ejecución por consola
+├── operadores.py     # Datos, evaluación y operadores de los algoritmos
 ├── tests.py          # Pruebas de los operadores y del algoritmo
 ├── experimentos.py   # Experimentos variando los parámetros de ACS
-├── graficar.py       # Gráficos de convergencia y de experimentos
+├── graficar.py       # Gráficos individuales y comparación promedio
 ├── datos/            # Instancias de Taillard
 ├── resultados/       # CSV de ejecuciones y experimentos
 ├── graficos/         # Gráficos PDF
@@ -57,6 +62,54 @@ también acepta los archivos originales de Taillard (lee la primera instancia).
 
 ## Ejecución
 
+### Algoritmo genético
+
+```bash
+python ag.py datos/tai20_5.txt 12345 50 200 0.8 0.1 resultados/res_ag.csv
+```
+
+Argumentos, en ese orden: instancia, semilla, tamaño de población,
+generaciones, probabilidad de cruce, probabilidad de mutación y salida CSV.
+La población debe contener al menos 2 individuos; las generaciones deben ser
+positivas y las probabilidades estar entre 0 y 1. `python ag.py --help` muestra
+la ayuda completa.
+
+El AG usa torneo de dos individuos, cruce OX, mutación por inserción y un
+individuo élite. Se siembra un generador local para que la misma instancia,
+semilla y parámetros produzcan la misma secuencia y makespan. Su CSV tiene
+una fila por generación: mejor de esa generación, mejor acumulado, RPD y
+tiempo de CPU acumulado. El tiempo incluye la búsqueda desde la población
+inicial y excluye lectura y escritura de archivos. El mejor acumulado se
+inicializa con la población inicial y, por eso, nunca empeora.
+
+Los trabajos se indexan desde 0 dentro del programa y desde 1 en pantalla y
+CSV. La matriz común es `tiempos[trabajo, maquina]`. AG y ACS llaman al mismo
+`calcular_makespan` de `operadores.py`, al igual que AM.
+
+### Algoritmo memético
+
+```bash
+python am.py datos/tai20_5.txt 12345 50 200 0.8 0.1 10 resultados/res_am.csv
+```
+
+Los primeros seis argumentos son los mismos del AG. El argumento `10` es la
+**frecuencia de búsqueda local**: se aplica en las generaciones 10, 20, 30,
+etc., al mejor individuo de la población recién generada. Debe ser un entero
+positivo. `python am.py --help` muestra el orden completo.
+
+AM usa la misma selección, cruce, mutación y elitismo del AG. La búsqueda
+local mueve un trabajo a otra posición y acepta la primera inserción que
+reduce el makespan. Repite desde la solución mejorada hasta que no encuentra
+una mejora o evalúa `10 × número de trabajos` vecinos. Este límite evita que
+una sola búsqueda local en 100×10 consuma una parte excesiva del experimento.
+No incorpora perturbaciones ni reinicios por estancamiento.
+
+El CSV tiene una fila por generación, el campo `frecuencia_bl` y las mismas
+métricas que AG. El makespan de la generación se registra después de la
+búsqueda local cuando corresponda. La medición de CPU incluye esa búsqueda.
+
+### Ant Colony System
+
 Orden fijo de argumentos, según el enunciado del Proyecto 2: instancia,
 semilla, hormigas, iteraciones, evaporación (`alpha`), peso heurístico
 (`beta`), `q0` y archivo de salida.
@@ -79,10 +132,28 @@ valor conocido, el RPD y el tiempo acumulado:
 RPD(%) = (C_max obtenido - C_max mejor conocido) / C_max mejor conocido × 100
 ```
 
-La misma semilla e instancia entregan siempre la misma secuencia y el mismo
-makespan.
+La misma semilla, instancia y parámetros entregan siempre la misma secuencia
+y el mismo makespan.
 
-## Algoritmo
+## CSV y tiempo de CPU comunes
+
+AG, AM y ACS usan el mismo escritor de `operadores.py`, con las mismas
+columnas y una fila por generación o iteración. `algoritmo` identifica el
+método; los parámetros que no le corresponden quedan vacíos. Las secuencias
+se guardan desde 1 y `rpd` corresponde a `mejor_makespan`, el mejor acumulado.
+Los valores se guardan sin redondeo adicional; se redondean al mostrarlos.
+
+`tiempo_segundos` mide CPU acumulada con `process_time()`, desde antes de
+inicializar cada algoritmo. Incluye la población inicial de AG/AM, la
+heurística y feromonas iniciales de ACS, y la búsqueda local de AM. Excluye
+lectura de datos, escritura del CSV e impresión. La última fila contiene el
+resultado y tiempo final de la ejecución; las anteriores permiten graficar
+la convergencia.
+
+La comparación final está en `resultados/comparacion_algoritmos`: contiene
+27 CSV obtenidos con `process_time()`, uno por algoritmo, instancia y semilla.
+
+## Algoritmo ACS
 
 `acs.py` muestra las etapas del algoritmo; los detalles están en `operadores.py`:
 
@@ -132,24 +203,50 @@ Verifican que:
   siguen sus fórmulas;
 - las hormigas generan permutaciones válidas;
 - el algoritmo es reproducible y la mejor solución mejora o se mantiene.
+- AG conserva permutaciones, élite y padres; su resultado y CSV son coherentes.
+- AM aplica búsqueda local en la frecuencia indicada, mantiene la
+  reproducibilidad y respeta el límite de evaluaciones de vecinos.
 
-## Experimentos
+## Comparación final
 
-```bash
-python experimentos.py                 # genera resultados/experimentos.csv
-python graficar.py resultados/experimentos.csv graficos/experimentos.pdf
-```
+Cada configuración se ejecutó con las semillas 1, 2 y 3, población o colonia
+de 50 y 600 iteraciones. Los parámetros definitivos fueron:
 
-Configuración base: 20 hormigas, 100 iteraciones, `alpha = 0.1`, `beta = 2.0`,
-`q0 = 0.9`. Se varía un parámetro a la vez y cada configuración se ejecuta
-con las semillas 1 a 5 en las tres instancias.
+| Instancia | AG (`p_c`, `p_m`) | AM (`p_c`, `p_m`, `K`) | ACS (`alpha`, `beta`, `q0`) |
+|---|---|---|---|
+| `tai20_5` | 0.86, 0.16 | 0.85, 0.15, 100 | 0.1, 2.0, 0.9 |
+| `tai50_10` | 0.70, 0.20 | 0.85, 0.15, 50 | 0.1, 2.0, 0.9 |
+| `tai100_10` | 0.70, 0.20 | 0.85, 0.15, 50 | 0.1, 2.0, 0.9 |
+
+El ajuste fue exploratorio y no exhaustivo sobre estas mismas instancias. Se
+compararon probabilidades de cruce y mutación para AG/AM, la frecuencia de
+búsqueda local para AM y los parámetros de colonia de ACS. Se priorizó el menor
+RPD observado y se usó el tiempo de CPU como criterio secundario. No se empleó
+un conjunto de validación independiente, por lo que estas configuraciones no
+deben interpretarse como óptimos globales de parámetros.
+
+`experimentos.py` conserva el barrido de sensibilidad de ACS. Prueba 5, 10, 20
+y 40 hormigas; 25, 50, 100 y 200 iteraciones; cuatro valores de `alpha`, `beta`
+y `q0`; y cinco semillas. Su CSV no forma parte de la comparación definitiva.
 
 ## Gráficos
 
+Para regenerar los tres gráficos comparativos usados en el informe:
+
 ```bash
-python graficar.py resultados/res_acs_tai50_10.csv graficos/convergencia_tai50_10.pdf
+python graficar.py resultados/comparacion_algoritmos graficos
+```
+
+El programa agrupa automáticamente los CSV por instancia y algoritmo, promedia
+las tres semillas y genera `convergencia_tai20_5.pdf`,
+`convergencia_tai50_10.pdf` y `convergencia_tai100_10.pdf`.
+
+También puede graficarse una ejecución individual:
+
+```bash
+python graficar.py resultados/comparacion_algoritmos/ACS_tai50_10_s1.csv graficos/acs_tai50_10_s1.pdf
 ```
 
 Si se omite el segundo argumento se usa `graficos/<nombre del CSV>.pdf`.
-`graficar.py` reconoce si el CSV proviene de `acs.py` (curva de convergencia)
-o de `experimentos.py` (sensibilidad a los parámetros y calidad vs. tiempo).
+`graficar.py` también reconoce el CSV de `experimentos.py` para visualizar la
+sensibilidad de ACS.
