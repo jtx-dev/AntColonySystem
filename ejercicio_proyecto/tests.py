@@ -8,6 +8,7 @@ import numpy as np
 from acs import ParametrosACS, ejecutar_acs
 from ag import ejecutar_ag
 from am import ejecutar_am
+from graficar import graficar_comparacion
 from operadores import (
     actualizar_feromona_local,
     actualizar_feromonas,
@@ -30,6 +31,7 @@ from operadores import (
 )
 
 DATOS = Path(__file__).parent / 'datos'
+RESULTADOS = Path(__file__).parent / 'resultados' / 'comparacion_algoritmos'
 
 # 3 trabajos x 2 máquinas: tiempos[trabajo, maquina]
 EJEMPLO = np.array([
@@ -270,6 +272,17 @@ def probar_am_completo():
             raise AssertionError('AM debe rechazar frecuencias no positivas.')
 
 
+def probar_grafico_comparativo():
+    with TemporaryDirectory(dir=Path(__file__).parent) as temporal:
+        salidas = graficar_comparacion(RESULTADOS, Path(temporal))
+        assert {salida.name for salida in salidas} == {
+            'convergencia_tai20_5.pdf',
+            'convergencia_tai50_10.pdf',
+            'convergencia_tai100_10.pdf',
+        }
+        assert all(salida.stat().st_size > 0 for salida in salidas)
+
+
 if __name__ == '__main__':
     probar_lectura_taillard()
     probar_makespan_calculado_a_mano()
@@ -283,4 +296,5 @@ if __name__ == '__main__':
     probar_ag_completo()
     probar_busqueda_local()
     probar_am_completo()
+    probar_grafico_comparativo()
     print('Pruebas correctas.')

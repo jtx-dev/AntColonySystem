@@ -1,4 +1,6 @@
 __pycache__/
 *.pyc
-enunciado2.pdf
-Proyecto2_PFSP_Enunciado (1).pdf
+*.aux
+*.log
+*.out
+tmp/

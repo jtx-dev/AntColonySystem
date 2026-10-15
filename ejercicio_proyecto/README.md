@@ -3,8 +3,8 @@
 AG (`ag.py`) y AM (`am.py`) reutilizan los operadores del Proyecto 1,
 adaptados al formato de datos y evaluador comunes de este proyecto.
 
-Adaptación del ACS de Berlin52 (directorio raíz del repositorio) al
-*Permutation Flow Shop Scheduling Problem* (PFSP), siguiendo la metodología
+Adaptación al *Permutation Flow Shop Scheduling Problem* (PFSP) del ACS
+desarrollado previamente para Berlin52, siguiendo la metodología
 del Pre Proyecto 2: separar el **algoritmo general** (`acs.py`) de los
 **operadores específicos del problema** (`operadores.py`), probarlos,
 experimentar con los parámetros y analizar los resultados.
@@ -35,7 +35,7 @@ ejercicio_proyecto/
 ├── operadores.py     # Datos, evaluación y operadores de los algoritmos
 ├── tests.py          # Pruebas de los operadores y del algoritmo
 ├── experimentos.py   # Experimentos variando los parámetros de ACS
-├── graficar.py       # Gráficos de convergencia y de experimentos
+├── graficar.py       # Gráficos individuales y comparación promedio
 ├── datos/            # Instancias de Taillard
 ├── resultados/       # CSV de ejecuciones y experimentos
 ├── graficos/         # Gráficos PDF
@@ -150,11 +150,8 @@ lectura de datos, escritura del CSV e impresión. La última fila contiene el
 resultado y tiempo final de la ejecución; las anteriores permiten graficar
 la convergencia.
 
-Los CSV de ACS generados antes de este cambio contienen tiempo transcurrido
-medido con `perf_counter()`. Es necesario repetir esas ejecuciones para
-comparar tiempos de CPU; los resultados antiguos no se convierten automáticamente.
-`experimentos.py` conserva su formato de resumen (una fila por ejecución)
-y toma el tiempo de CPU de ACS en las nuevas ejecuciones.
+La comparación final está en `resultados/comparacion_algoritmos`: contiene
+27 CSV obtenidos con `process_time()`, uno por algoritmo, instancia y semilla.
 
 ## Algoritmo ACS
 
@@ -210,28 +207,46 @@ Verifican que:
 - AM aplica búsqueda local en la frecuencia indicada, mantiene la
   reproducibilidad y respeta el límite de evaluaciones de vecinos.
 
-## Experimentos
+## Comparación final
 
-```bash
-python experimentos.py                 # genera resultados/experimentos.csv
-python graficar.py resultados/experimentos.csv graficos/experimentos.pdf
-```
+Cada configuración se ejecutó con las semillas 1, 2 y 3, población o colonia
+de 50 y 600 iteraciones. Los parámetros definitivos fueron:
 
-Configuración base: 20 hormigas, 100 iteraciones, `alpha = 0.1`, `beta = 2.0`,
-`q0 = 0.9`. Se varía un parámetro a la vez y cada configuración se ejecuta
-con las semillas 1 a 5 en las tres instancias.
+| Instancia | AG (`p_c`, `p_m`) | AM (`p_c`, `p_m`, `K`) | ACS (`alpha`, `beta`, `q0`) |
+|---|---|---|---|
+| `tai20_5` | 0.86, 0.16 | 0.85, 0.15, 100 | 0.1, 2.0, 0.9 |
+| `tai50_10` | 0.70, 0.20 | 0.85, 0.15, 50 | 0.1, 2.0, 0.9 |
+| `tai100_10` | 0.70, 0.20 | 0.85, 0.15, 50 | 0.1, 2.0, 0.9 |
 
-El `resultados/experimentos.csv` incluido actualmente está incompleto (148 de
-300 ejecuciones) y fue generado antes de unificar el tiempo de CPU. Sirve
-para probar el gráfico, pero debe regenerarse por completo antes de usar sus
-resultados en el artículo.
+El ajuste fue exploratorio y no exhaustivo sobre estas mismas instancias. Se
+compararon probabilidades de cruce y mutación para AG/AM, la frecuencia de
+búsqueda local para AM y los parámetros de colonia de ACS. Se priorizó el menor
+RPD observado y se usó el tiempo de CPU como criterio secundario. No se empleó
+un conjunto de validación independiente, por lo que estas configuraciones no
+deben interpretarse como óptimos globales de parámetros.
+
+`experimentos.py` conserva el barrido de sensibilidad de ACS. Prueba 5, 10, 20
+y 40 hormigas; 25, 50, 100 y 200 iteraciones; cuatro valores de `alpha`, `beta`
+y `q0`; y cinco semillas. Su CSV no forma parte de la comparación definitiva.
 
 ## Gráficos
 
+Para regenerar los tres gráficos comparativos usados en el informe:
+
 ```bash
-python graficar.py resultados/res_acs_tai50_10.csv graficos/convergencia_tai50_10.pdf
+python graficar.py resultados/comparacion_algoritmos graficos
+```
+
+El programa agrupa automáticamente los CSV por instancia y algoritmo, promedia
+las tres semillas y genera `convergencia_tai20_5.pdf`,
+`convergencia_tai50_10.pdf` y `convergencia_tai100_10.pdf`.
+
+También puede graficarse una ejecución individual:
+
+```bash
+python graficar.py resultados/comparacion_algoritmos/ACS_tai50_10_s1.csv graficos/acs_tai50_10_s1.pdf
 ```
 
 Si se omite el segundo argumento se usa `graficos/<nombre del CSV>.pdf`.
-`graficar.py` reconoce los CSV de AG, AM o ACS (curva de convergencia) y el
-CSV de `experimentos.py` (sensibilidad a los parámetros y calidad vs. tiempo).
+`graficar.py` también reconoce el CSV de `experimentos.py` para visualizar la
+sensibilidad de ACS.
