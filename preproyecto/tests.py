@@ -79,10 +79,8 @@ def probar_reproducibilidad():
     costos = [registro['mejor_costo'] for registro in historial]
     assert costos == sorted(costos, reverse=True)
 
-
-if __name__ == '__main__':
-    probar_lectura_berlin52()
-    probar_recorrido_y_distancia()
-    probar_feromonas_y_construccion()
-    probar_reproducibilidad()
-    print('Pruebas correctas.')
+probar_lectura_berlin52()
+probar_recorrido_y_distancia()
+probar_feromonas_y_construccion()
+probar_reproducibilidad()
+print('Pruebas correctas.')
