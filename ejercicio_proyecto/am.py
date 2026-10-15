@@ -1,4 +1,4 @@
-"""Algoritmo memético para PFSP; ejecutar con --help para ver los argumentos."""
+"""Algoritmo memético para PFSP"""
 
 import argparse
 from pathlib import Path
@@ -90,38 +90,33 @@ def crear_parser():
     return parser
 
 
-def main():
-    parser = crear_parser()
-    argumentos = parser.parse_args()
-    try:
-        tiempos, mejor_conocido = leer_instancia(argumentos.instancia)
-        secuencia, makespan, historial = ejecutar_am(
-            tiempos, argumentos.semilla, argumentos.poblacion, argumentos.iteraciones,
-            argumentos.prob_cruce, argumentos.prob_mutacion, argumentos.frecuencia_bl,
-        )
-        guardar_resultados(
-            argumentos.salida, 'AM', argumentos.instancia, argumentos.semilla,
-            {
-                'iteraciones': argumentos.iteraciones,
-                'poblacion': argumentos.poblacion,
-                'prob_cruce': argumentos.prob_cruce,
-                'prob_mutacion': argumentos.prob_mutacion,
-                'frecuencia_bl': argumentos.frecuencia_bl,
-            },
-            mejor_conocido, historial,
-        )
-    except (OSError, ValueError) as error:
-        parser.error(str(error))
+parser = crear_parser()
+argumentos = parser.parse_args()
+try:
+    tiempos, mejor_conocido = leer_instancia(argumentos.instancia)
+    secuencia, makespan, historial = ejecutar_am(
+        tiempos, argumentos.semilla, argumentos.poblacion, argumentos.iteraciones,
+        argumentos.prob_cruce, argumentos.prob_mutacion, argumentos.frecuencia_bl,
+    )
+    guardar_resultados(
+        argumentos.salida, 'AM', argumentos.instancia, argumentos.semilla,
+        {
+            'iteraciones': argumentos.iteraciones,
+            'poblacion': argumentos.poblacion,
+            'prob_cruce': argumentos.prob_cruce,
+            'prob_mutacion': argumentos.prob_mutacion,
+            'frecuencia_bl': argumentos.frecuencia_bl,
+        },
+        mejor_conocido, historial,
+    )
+except (OSError, ValueError) as error:
+    parser.error(str(error))
 
-    trabajos, maquinas = tiempos.shape
-    print(f'Instancia: {Path(argumentos.instancia).name} ({trabajos} trabajos x {maquinas} máquinas)')
-    print('Mejor secuencia:', formatear_secuencia(secuencia))
-    print('Makespan:', makespan)
-    print('Mejor conocido:', mejor_conocido)
-    print(f'RPD: {calcular_rpd(makespan, mejor_conocido):.2f} %')
-    print(f"Tiempo de CPU: {historial[-1]['tiempo_segundos']:.3f} segundos")
-    print('Resultados guardados en:', argumentos.salida)
-
-
-if __name__ == '__main__':
-    main()
+trabajos, maquinas = tiempos.shape
+print(f'Instancia: {Path(argumentos.instancia).name} ({trabajos} trabajos x {maquinas} máquinas)')
+print('Mejor secuencia:', formatear_secuencia(secuencia))
+print('Makespan:', makespan)
+print('Mejor conocido:', mejor_conocido)
+print(f'RPD: {calcular_rpd(makespan, mejor_conocido):.2f} %')
+print(f"Tiempo de CPU: {historial[-1]['tiempo_segundos']:.3f} segundos")
+print('Resultados guardados en:', argumentos.salida)
