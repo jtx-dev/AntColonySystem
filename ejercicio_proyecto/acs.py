@@ -106,44 +106,40 @@ def crear_parser():
     return parser
 
 
-def main():
-    parser = crear_parser()
-    argumentos = parser.parse_args()
 
-    try:
-        parametros = ParametrosACS(
-            argumentos.semilla,
-            argumentos.hormigas,
-            argumentos.iteraciones,
-            argumentos.alpha,
-            argumentos.beta,
-            argumentos.q0,
-        )
-        tiempos, mejor_conocido = leer_instancia(argumentos.instancia)
-        secuencia, makespan, historial = ejecutar_acs(tiempos, parametros)
-        guardar_resultados(
-            argumentos.salida, 'ACS', argumentos.instancia, parametros.semilla,
-            {
-                'iteraciones': parametros.iteraciones,
-                'hormigas': parametros.hormigas,
-                'alpha': parametros.alpha,
-                'beta': parametros.beta,
-                'q0': parametros.q0,
-            },
-            mejor_conocido, historial,
-        )
-    except (OSError, ValueError) as error:
-        parser.error(str(error))
+parser = crear_parser()
+argumentos = parser.parse_args()
 
-    n, m = tiempos.shape
-    print(f'Instancia: {Path(argumentos.instancia).name} ({n} trabajos x {m} máquinas)')
-    print('Mejor secuencia:', formatear_secuencia(secuencia))
-    print('Makespan:', makespan)
-    print('Mejor conocido:', mejor_conocido)
-    print(f'RPD: {calcular_rpd(makespan, mejor_conocido):.2f} %')
-    print(f"Tiempo de CPU: {historial[-1]['tiempo_segundos']:.3f} segundos")
-    print('Resultados guardados en:', argumentos.salida)
+try:
+    parametros = ParametrosACS(
+        argumentos.semilla,
+        argumentos.hormigas,
+        argumentos.iteraciones,
+        argumentos.alpha,
+        argumentos.beta,
+        argumentos.q0,
+    )
+    tiempos, mejor_conocido = leer_instancia(argumentos.instancia)
+    secuencia, makespan, historial = ejecutar_acs(tiempos, parametros)
+    guardar_resultados(
+        argumentos.salida, 'ACS', argumentos.instancia, parametros.semilla,
+        {
+            'iteraciones': parametros.iteraciones,
+            'hormigas': parametros.hormigas,
+            'alpha': parametros.alpha,
+            'beta': parametros.beta,
+            'q0': parametros.q0,
+        },
+        mejor_conocido, historial,
+    )
+except (OSError, ValueError) as error:
+    parser.error(str(error))
 
-
-if __name__ == '__main__':
-    main()
+n, m = tiempos.shape
+print(f'Instancia: {Path(argumentos.instancia).name} ({n} trabajos x {m} máquinas)')
+print('Mejor secuencia:', formatear_secuencia(secuencia))
+print('Makespan:', makespan)
+print('Mejor conocido:', mejor_conocido)
+print(f'RPD: {calcular_rpd(makespan, mejor_conocido):.2f} %')
+print(f"Tiempo de CPU: {historial[-1]['tiempo_segundos']:.3f} segundos")
+print('Resultados guardados en:', argumentos.salida)

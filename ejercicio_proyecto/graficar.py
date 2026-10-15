@@ -1,4 +1,4 @@
-"""Gráficos de convergencia a partir de los CSV de AG, AM y ACS."""
+"""Gráficos a partir de los CSV de AG, AM y ACS."""
 import argparse
 import csv
 from pathlib import Path
@@ -126,47 +126,42 @@ def graficar_experimentos(filas, salida):
     plt.close(figura)
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Grafica resultados de AG, AM o ACS para PFSP.')
-    parser.add_argument(
-        'resultados',
-        help='CSV de una ejecución o carpeta con los CSV de la comparación.',
-    )
-    parser.add_argument(
-        'salida',
-        nargs='?',
-        help='PDF de salida, o carpeta de salida si resultados es una carpeta.',
-    )
-    argumentos = parser.parse_args()
+parser = argparse.ArgumentParser(description='Grafica resultados de AG, AM o ACS para PFSP.')
+parser.add_argument(
+    'resultados',
+    help='CSV de una ejecución o carpeta con los CSV de la comparación.',
+)
+parser.add_argument(
+    'salida',
+    nargs='?',
+    help='PDF de salida, o carpeta de salida si resultados es una carpeta.',
+)
+argumentos = parser.parse_args()
 
-    entrada = Path(argumentos.resultados)
-    if entrada.is_dir():
-        salida = Path(argumentos.salida or Path(__file__).parent / 'graficos')
-        try:
-            generados = graficar_comparacion(entrada, salida)
-        except (OSError, ValueError, KeyError) as error:
-            parser.error(str(error))
-        for generado in generados:
-            print('Gráfico guardado en:', generado)
-        return
-
+entrada = Path(argumentos.resultados)
+if entrada.is_dir():
+    salida = Path(argumentos.salida or Path(__file__).parent / 'graficos')
     try:
-        filas = leer_csv(entrada)
+        generados = graficar_comparacion(entrada, salida)
     except (OSError, ValueError, KeyError) as error:
         parser.error(str(error))
-    if not filas:
-        parser.error('El archivo de resultados no contiene datos.')
+    for generado in generados:
+        print('Gráfico guardado en:', generado)
+    return
 
-    salida = Path(argumentos.salida or Path(__file__).parent / 'graficos' / f'{entrada.stem}.pdf')
-    salida.parent.mkdir(parents=True, exist_ok=True)
-    if 'iteracion' in filas[0]:
-        graficar_convergencia(filas, salida)
-    elif 'factor' in filas[0]:
-        graficar_experimentos(filas, salida)
-    else:
-        parser.error('El CSV no contiene iteraciones ni experimentos reconocibles.')
-    print('Gráfico guardado en:', salida)
+try:
+    filas = leer_csv(entrada)
+except (OSError, ValueError, KeyError) as error:
+    parser.error(str(error))
+if not filas:
+    parser.error('El archivo de resultados no contiene datos.')
 
-
-if __name__ == '__main__':
-    main()
+salida = Path(argumentos.salida or Path(__file__).parent / 'graficos' / f'{entrada.stem}.pdf')
+salida.parent.mkdir(parents=True, exist_ok=True)
+if 'iteracion' in filas[0]:
+    graficar_convergencia(filas, salida)
+elif 'factor' in filas[0]:
+    graficar_experimentos(filas, salida)
+else:
+    parser.error('El CSV no contiene iteraciones ni experimentos reconocibles.')
+print('Gráfico guardado en:', salida)

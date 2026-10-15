@@ -143,31 +143,27 @@ def crear_parser():
     return parser
 
 
-def main():
-    parser = crear_parser()
-    argumentos = parser.parse_args()
 
-    try:
-        parametros = ParametrosACS(
-            argumentos.hormigas,
-            argumentos.iteraciones,
-            argumentos.evaporacion,
-            argumentos.peso_heuristico,
-            argumentos.q0,
-            argumentos.semilla,
-        )
-        coordenadas, n = leer_datos(argumentos.instancia)
-        matriz_distancias = calcular_distancias(coordenadas, n)
-        recorrido, costo, historial = ejecutar_acs(matriz_distancias, parametros)
-        guardar_resultados(argumentos.salida, argumentos.instancia, parametros, historial)
-    except (OSError, ValueError) as error:
-        parser.error(str(error))
+parser = crear_parser()
+argumentos = parser.parse_args()
 
-    print('Mejor recorrido:', ' -> '.join(str(ciudad + 1) for ciudad in recorrido))
-    print('Costo:', costo)
-    print(f"Tiempo: {historial[-1]['tiempo_segundos']:.3f} segundos")
-    print('Resultados guardados en:', argumentos.salida)
+try:
+    parametros = ParametrosACS(
+        argumentos.hormigas,
+        argumentos.iteraciones,
+        argumentos.evaporacion,
+        argumentos.peso_heuristico,
+        argumentos.q0,
+        argumentos.semilla,
+    )
+    coordenadas, n = leer_datos(argumentos.instancia)
+    matriz_distancias = calcular_distancias(coordenadas, n)
+    recorrido, costo, historial = ejecutar_acs(matriz_distancias, parametros)
+    guardar_resultados(argumentos.salida, argumentos.instancia, parametros, historial)
+except (OSError, ValueError) as error:
+    parser.error(str(error))
 
-
-if __name__ == '__main__':
-    main()
+print('Mejor recorrido:', ' -> '.join(str(ciudad + 1) for ciudad in recorrido))
+print('Costo:', costo)
+print(f"Tiempo: {historial[-1]['tiempo_segundos']:.3f} segundos")
+print('Resultados guardados en:', argumentos.salida)
