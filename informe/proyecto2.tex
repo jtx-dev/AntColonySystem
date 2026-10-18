@@ -74,32 +74,46 @@ El AM comparte inicialización, selección, cruce, mutación y elitismo con el A
 Cada aplicación evalúa como máximo $10n$ vecinos, además de evaluar inicialmente la solución recibida. También termina si completa un recorrido sin mejora. El límite permite controlar el costo, pero puede interrumpir la exploración antes de certificar un óptimo local. Como cada vecino se evalúa en $O(nm)$, la búsqueda acotada requiere a lo sumo $O(n^2m)$ por aplicación. El orden determinista favorece examinar primero ciertas posiciones cuando se agota el presupuesto.
 
 \subsection{Adaptación de ACS al PFSP}
-Se emplea un grafo dirigido cuyos nodos son trabajos y un nodo ficticio $s$ representa el inicio. Las matrices de feromona y visibilidad tienen dimensión $(n+1)\times n$. Una hormiga elige sucesivamente entre los trabajos pendientes, comenzando en $s$ y terminando tras programar los $n$ trabajos. No existe arista de regreso al inicio.
+En ACS, cada hormiga artificial arma una secuencia de trabajos. Elige el primero y luego agrega trabajos que todavía no ha utilizado, hasta completar la lista. Para representar la elección inicial se agrega un punto ficticio $s$, que no corresponde a un trabajo real.
 
-La visibilidad estática se define mediante un indicador de desajuste entre tiempos consecutivos:
+Las decisiones se apoyan en dos valores: la feromona y la información heurística. La feromona $\tau_{ij}$ es un número que cambia durante la búsqueda y sirve para recordar qué elecciones formaron parte de buenas soluciones. En este caso, se refiere a colocar el trabajo $j$ inmediatamente después del trabajo $i$. La información heurística $\eta_{ij}$ se calcula con los tiempos de procesamiento y sirve como orientación inicial.
+
+La información se guarda por separado para cada orden de trabajos. Esto se debe a que cambiar el orden puede cambiar las esperas entre máquinas y el makespan, como ocurrió en el ejemplo de los trabajos $A$ y $B$. Por eso, el algoritmo no supone que lo aprendido al programar $A$ y luego $B$ también sirve para programar $B$ y luego $A$. Las tablas de feromona y heurística tienen $(n+1)$ filas y $n$ columnas; la fila adicional permite guardar la información para elegir el primer trabajo.
+
+Para calcular la heurística se compara el tiempo del trabajo $j$ en una máquina con el de $i$ en la siguiente. Se suman las diferencias positivas y se ignoran las negativas. Esa suma se llama $d_{ij}$. Para elegir el primer trabajo se usa $d_{sj}$, que suma sus tiempos en las primeras $m-1$ máquinas:
 \begin{align}
 d_{ij}&=\sum_{k=1}^{m-1}\max\{0,p_{j,k}-p_{i,k+1}\},\\
 d_{sj}&=\sum_{k=1}^{m-1}p_{j,k},\qquad
-\eta_{ij}=\frac{1}{1+d_{ij}}.
+\eta_{ij}=\frac{1}{1+d_{ij}}.\label{eq:heuristica-inicio}
 \end{align}
-Este indicador aproxima condiciones que pueden generar espera al colocar $j$ después de $i$. Es una decisión de diseño del proyecto: no calcula la inactividad exacta ni considera todas las finalizaciones del prefijo construido. El makespan real siempre se obtiene con~\eqref{eq:recurrencia}.
+Para elegir el primer trabajo todavía no existe un trabajo anterior. Por eso, cuando $i=s$, se utiliza $d_{sj}$, definido en la ecuación~\eqref{eq:heuristica-inicio}, y se calcula $\eta_{sj}=1/(1+d_{sj})$. Después de elegir el primer trabajo, se utiliza $d_{ij}$ para evaluar los siguientes.
 
-La feromona inicial es $\tau_0=1/[nC_{\max}(\pi_{\mathrm{SPT}})]$, donde SPT ordena por tiempo total de procesamiento creciente. SPT sirve para fijar la escala de feromona; su secuencia no se incorpora como mejor solución inicial. Si $U$ es el conjunto de trabajos pendientes, los pesos y probabilidades son
+La regla favorece los pares con una suma menor, porque reciben un valor mayor de $\eta_{ij}$. Se utiliza como una aproximación para orientar la elección según posibles esperas. No calcula la espera exacta, ya que esta también depende de los trabajos programados antes. Para saber qué tan buena es una secuencia completa, se calcula su makespan mediante~\eqref{eq:recurrencia}.
+
+Todas las feromonas parten con el mismo valor, $\tau_0=1/[nC_{\max}(\pi_{\mathrm{SPT}})]$. Para obtenerlo se ordenan los trabajos de menor a mayor suma de tiempos de procesamiento, regla llamada SPT, y se calcula el makespan de esa secuencia. SPT se utiliza únicamente para fijar este valor inicial.
+
+Al elegir el siguiente trabajo, la hormiga combina feromona y heurística en un peso $w_{ij}$. El parámetro $\beta$ controla la influencia de la heurística. Si $U$ es el conjunto de trabajos que faltan por programar, se calcula
 \begin{equation}
 w_{ij}=\tau_{ij}\eta_{ij}^{\beta},\qquad
 P(j\mid i,U)=\frac{w_{ij}}{\sum_{u\in U}w_{iu}}.
 \end{equation}
-Con probabilidad $q_0$ se selecciona el mayor peso; en otro caso se muestrea con esas probabilidades. Los empates de la elección codiciosa favorecen el primer índice disponible. En cada arista recorrida se aplica
+La segunda fórmula convierte los pesos en probabilidades: divide el peso de cada opción por la suma de todos ellos. Con probabilidad $q_0$, la hormiga elige directamente el trabajo de mayor peso. En otro caso, realiza un sorteo usando esas probabilidades. Así puede aprovechar las opciones mejor valoradas y también probar otras. Si hay empate en el mayor peso, se elige el trabajo de menor índice.
+
+Después de cada elección se modifica la feromona del paso utilizado. Esta es la actualización local:
 \begin{equation}
 \tau_{ij}\leftarrow(1-\alpha)\tau_{ij}+\alpha\tau_0.
 \label{eq:local}
 \end{equation}
-Las hormigas se construyen secuencialmente y comparten las modificaciones locales. Al terminar la iteración, únicamente las aristas de la mejor hormiga de esa iteración reciben
+La fórmula acerca la feromona a su valor inicial. Si había aumentado por resultados anteriores, ahora disminuye, dando más oportunidad a otras opciones. Las hormigas construyen sus secuencias una después de otra y usan la misma tabla, por lo que cada una encuentra los cambios realizados por las anteriores.
+
+Cuando todas terminan, se calcula el makespan de cada secuencia y se escoge la mejor de esa iteración, llamada $\pi^{\mathrm{it}}$. Solo los pasos que aparecen en ella reciben la actualización global:
 \begin{equation}
 \tau_{ij}\leftarrow(1-\alpha)\tau_{ij}+\frac{\alpha}{C_{\max}(\pi^{\mathrm{it}})}.
 \label{eq:global}
 \end{equation}
-Se incluye la arista desde $s$; las restantes no cambian en esta fase. Se usa el mismo $\alpha$ en ambas actualizaciones. El mejor histórico se conserva para la salida, pero el depósito corresponde al mejor de la iteración, variante permitida en el diseño experimental.
+El aporte depende de $1/C_{\max}$: una secuencia con menor makespan aporta más feromona. También se actualiza el paso desde $s$ al primer trabajo. Los demás pasos no cambian en esta fase. El parámetro $\alpha$ controla cuánto influye el nuevo valor y se usa en ambas actualizaciones.
+
+Por último, se guarda la mejor secuencia encontrada durante toda la ejecución. Esta es la que se entrega como resultado, aunque para actualizar las feromonas se use la mejor de cada iteración. El Algoritmo~\ref{alg:acs} resume el procedimiento; $H$ indica la cantidad de hormigas y $T$ la cantidad de iteraciones.
 
 \begin{algorithm}[t]
 \caption{ACS adaptado al PFSP}
@@ -202,7 +216,7 @@ En la instancia de $20\times5$, AG y AM presentaron resultados promedio muy pró
 
 En $50\times10$, AM obtuvo la mejor calidad promedio, con un makespan de 3172.00 y un RPD de 6.05\%. AG alcanzó 3186.00 y un RPD de 6.52\%. AM produjo la mejor solución individual, pero también presentó el intervalo más amplio: 3129--3233, frente a 3170--3196 para AG y 3236--3250 para ACS. Esto indica mayor sensibilidad a la semilla. El tiempo promedio de AM fue 12.64 segundos, frente a 10.76 de AG. ACS presentó el peor promedio de calidad y el mayor tiempo de CPU, con 39.01 segundos.
 
-En $100\times10$, AG obtuvo el mejor desempeño: un makespan promedio de 5959.33, un RPD de 3.28\% y 20.66 segundos de CPU. AM y ACS alcanzaron calidades promedio similares, con RPD de 5.59\% y 5.55\%, respectivamente. No obstante, AM necesitó 28.30 segundos y ACS 77.53. En esta instancia, la búsqueda local del AM no compensó su costo y AG consiguió el mejor equilibrio entre exploración, calidad y tiempo.
+En $100\times10$, AG obtuvo el mejor desempeño: un makespan promedio de 5959.33, un RPD de 3.28\% y 20.66 segundos de CPU. AM y ACS alcanzaron calidades promedio similares, con RPD de 5.59\% y 5.55\%, respectivamente. No obstante, AM necesitó 28.30 segundos y ACS 77.53. Con las configuraciones evaluadas, AG obtuvo mejores soluciones y utilizó menos CPU que AM. Sin embargo, ambos usaron distintas probabilidades de cruce y mutación, por lo que esta comparación no permite aislar el efecto de la búsqueda local.
 
 \subsection{Análisis de convergencia}
 
@@ -235,7 +249,7 @@ En $100\times10$, AG continúa mejorando durante gran parte de las 600 generacio
 
 \subsection{Exploración, explotación y escalabilidad}
 
-AG utiliza cruce y mutación para explorar distintas regiones del espacio de permutaciones, mientras que el elitismo conserva la mejor solución. Esta combinación presentó el mejor comportamiento en la instancia grande y mantuvo el menor tiempo de CPU. AM agrega explotación mediante búsqueda local por inserción. Esta estrategia permitió alcanzar la referencia en una ejecución pequeña y produjo el mejor promedio en la instancia mediana, pero aumentó la variabilidad y el costo computacional.
+AG utiliza cruce y mutación para generar nuevas secuencias, mientras que el elitismo conserva la mejor solución. AM agrega una búsqueda local que prueba mover trabajos dentro de una secuencia para mejorarla. En los experimentos, la configuración de AG obtuvo el mejor resultado promedio y el menor tiempo de CPU en la instancia grande. La de AM alcanzó la referencia en una ejecución pequeña y obtuvo el mejor promedio en la mediana, donde también mostró mayor variación entre semillas y mayor CPU que AG. Estas diferencias corresponden a las configuraciones completas; para medir el aporte de la búsqueda local por separado habría que mantener iguales los demás parámetros.
 
 ACS equilibra exploración y explotación mediante $q_0$, la información heurística y las actualizaciones de feromona. Sin embargo, su visibilidad estática solo aproxima la conveniencia de colocar un trabajo después de otro y no considera el estado completo del prefijo. Esta limitación puede contribuir al estancamiento observado. Además, la construcción secuencial de cada permutación produjo un costo de CPU superior.
 
@@ -245,7 +259,7 @@ Los resultados no identifican un ganador universal. AM fue competitivo en las in
 
 Este trabajo implementó y comparó AG, AM y ACS para minimizar el makespan en el PFSP. Los tres algoritmos utilizaron una representación común, el mismo evaluador y semillas explícitas, lo que permitió realizar una comparación reproducible.
 
-AM obtuvo el menor makespan promedio en $20\times5$ y $50\times10$. En la instancia pequeña, una ejecución alcanzó el valor de referencia de 1278. No obstante, las diferencias promedio entre AG y AM fueron reducidas y AM presentó mayor variación en la instancia mediana. En $100\times10$, AG consiguió el menor RPD y el menor tiempo de CPU, mostrando el mejor equilibrio entre calidad y costo computacional.
+AM obtuvo el menor makespan promedio en $20\times5$ y $50\times10$. En la instancia pequeña, una ejecución alcanzó el valor de referencia de 1278. No obstante, las diferencias promedio entre AG y AM fueron reducidas y AM presentó mayor variación en la instancia mediana. En $100\times10$, la configuración de AG consiguió el menor RPD y el menor tiempo de CPU entre las evaluadas.
 
 ACS obtuvo tiempos de ejecución mayores y no superó a los métodos evolutivos en las instancias estudiadas. Su comportamiento sugiere que la información heurística estática y la actualización de feromona empleadas no fueron suficientes para mantener una exploración efectiva.
 
